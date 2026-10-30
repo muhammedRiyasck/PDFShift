@@ -15,7 +15,9 @@ backend/outputs/*
 !backend/outputs/.gitkeep
 
 # Environment and debug
-.env*
+.env
+.env.local
+.env.*.local
+!.env.example
 *.log
 .DS_Store
-
