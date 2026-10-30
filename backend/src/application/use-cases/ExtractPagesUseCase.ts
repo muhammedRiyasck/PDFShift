@@ -1,33 +1,59 @@
 import { IPdfRepository } from '../../domain/repositories/IPdfRepository';
+import { IStorageService } from '../../domain/services/IStorageService';
 import { PdfLibService } from '../../infrastructure/pdf/PdfLibService';
-import path from 'path';
+import { v4 as uuidv4 } from 'uuid';
+
+export interface ExtractResult {
+  s3Key: string;
+  downloadUrl: string;
+  filename: string;
+}
 
 export class ExtractPagesUseCase {
   constructor(
     private readonly pdfRepository: IPdfRepository,
-    private readonly pdfLibService: PdfLibService,
-    private readonly outputDir: string
+    private readonly storageService: IStorageService,
+    private readonly pdfLibService: PdfLibService
   ) {}
 
-  async execute(id: string, pages: number[]): Promise<string> {
-    const doc = await this.pdfRepository.findById(id);
-    if (!doc) throw new Error(`PDF with id "${id}" not found`);
-
-    if (!pages || pages.length === 0) {
-      throw new Error('No pages selected');
+  async execute(pdfId: string, pages: number[]): Promise<ExtractResult> {
+    const doc = await this.pdfRepository.findById(pdfId);
+    if (!doc) {
+      throw new Error(`PDF with id "${pdfId}" not found`);
     }
 
-    // Validate page numbers (1-indexed)
-    for (const page of pages) {
-      if (page < 1 || page > doc.pageCount) {
-        throw new Error(`Page ${page} is out of range (1-${doc.pageCount})`);
-      }
+    if (pages.length === 0) {
+      throw new Error('At least one page must be selected');
     }
 
-    const outputFilename = `extracted-${id}-${Date.now()}.pdf`;
-    const outputPath = path.join(this.outputDir, outputFilename);
+    const invalidPages = pages.filter((p) => p < 1 || p > doc.pageCount);
+    if (invalidPages.length > 0) {
+      throw new Error(
+        `Invalid page numbers: ${invalidPages.join(', ')}. Document has ${doc.pageCount} pages.`
+      );
+    }
 
-    await this.pdfLibService.extractPages(doc.filePath, pages, outputPath);
-    return outputPath;
+    // 1. Fetch source PDF buffer from S3
+    const sourceBuffer = await this.storageService.getFileBuffer(doc.s3Key);
+
+    // 2. Extract and reorder pages using pdf-lib
+    const extractedBytes = await this.pdfLibService.extractPages(sourceBuffer, pages);
+
+    // 3. Upload extracted output directly to S3 outputs/
+    const outputFilename = `extracted-${uuidv4()}.pdf`;
+    const outputKey = `outputs/${outputFilename}`;
+    await this.storageService.uploadFile(outputKey, extractedBytes, 'application/pdf');
+
+    // 4. Generate presigned download URL
+    const downloadUrl = await this.storageService.getPresignedDownloadUrl(
+      outputKey,
+      `extracted-${doc.originalName}`
+    );
+
+    return {
+      s3Key: outputKey,
+      downloadUrl,
+      filename: outputFilename,
+    };
   }
 }

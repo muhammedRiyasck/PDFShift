@@ -1,11 +1,14 @@
 import { Router } from 'express';
 import { PdfController } from '../controllers/PdfController';
-import { upload } from '../../infrastructure/storage/MulterUploader';
 
 export function createPdfRouter(controller: PdfController): Router {
   const router = Router();
 
-  router.post('/upload', upload.single('pdf'), controller.uploadPdf);
+  // Presigned S3 upload flow
+  router.post('/presign-upload', controller.createPresignedUpload);
+  router.post('/confirm-upload', controller.confirmUpload);
+
+  // PDF retrieval and processing
   router.get('/pdf/:id/info', controller.getPdfInfo);
   router.get('/pdf/:id/file', controller.getPdfFile);
   router.post('/pdf/:id/extract', controller.extractPages);

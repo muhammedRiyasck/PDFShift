@@ -1,25 +1,49 @@
 import { Request, Response, NextFunction } from 'express';
-import { UploadPdfUseCase } from '../../application/use-cases/UploadPdfUseCase';
+import { CreatePresignedUploadUseCase } from '../../application/use-cases/CreatePresignedUploadUseCase';
+import { ConfirmUploadUseCase } from '../../application/use-cases/ConfirmUploadUseCase';
 import { GetPdfInfoUseCase } from '../../application/use-cases/GetPdfInfoUseCase';
 import { ExtractPagesUseCase } from '../../application/use-cases/ExtractPagesUseCase';
-import { v4 as uuidv4 } from 'uuid';
-import path from 'path';
+import { IStorageService } from '../../domain/services/IStorageService';
 
 export class PdfController {
   constructor(
-    private readonly uploadPdfUseCase: UploadPdfUseCase,
+    private readonly createPresignedUploadUseCase: CreatePresignedUploadUseCase,
+    private readonly confirmUploadUseCase: ConfirmUploadUseCase,
     private readonly getPdfInfoUseCase: GetPdfInfoUseCase,
-    private readonly extractPagesUseCase: ExtractPagesUseCase
+    private readonly extractPagesUseCase: ExtractPagesUseCase,
+    private readonly storageService: IStorageService
   ) {}
 
-  uploadPdf = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  createPresignedUpload = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      if (!req.file) {
-        res.status(400).json({ error: 'No file uploaded' });
+      const { filename, contentType = 'application/pdf' } = req.body;
+      if (!filename) {
+        res.status(400).json({ error: 'filename is required' });
         return;
       }
-      const id = uuidv4();
-      const doc = await this.uploadPdfUseCase.execute(req.file, id);
+
+      const result = await this.createPresignedUploadUseCase.execute(filename, contentType);
+      res.status(200).json(result);
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  confirmUpload = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { id, s3Key, originalName, fileSize } = req.body;
+      if (!id || !s3Key || !originalName) {
+        res.status(400).json({ error: 'id, s3Key, and originalName are required' });
+        return;
+      }
+
+      const doc = await this.confirmUploadUseCase.execute({
+        id,
+        s3Key,
+        originalName,
+        fileSize,
+      });
+
       res.status(201).json({
         id: doc.id,
         originalName: doc.originalName,
@@ -50,9 +74,11 @@ export class PdfController {
     try {
       const { id } = req.params;
       const doc = await this.getPdfInfoUseCase.execute(id);
+      const buffer = await this.storageService.getFileBuffer(doc.s3Key);
+
       res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `inline; filename="${doc.originalName}"`);
-      res.sendFile(path.resolve(doc.filePath));
+      res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(doc.originalName)}"`);
+      res.send(buffer);
     } catch (err) {
       next(err);
     }
@@ -68,9 +94,11 @@ export class PdfController {
         return;
       }
 
-      const outputPath = await this.extractPagesUseCase.execute(id, pages);
-      const filename = path.basename(outputPath);
-      res.json({ downloadUrl: `/api/pdf/download/${filename}` });
+      const result = await this.extractPagesUseCase.execute(id, pages);
+      res.json({
+        downloadUrl: result.downloadUrl,
+        filename: result.filename,
+      });
     } catch (err) {
       next(err);
     }
@@ -79,11 +107,9 @@ export class PdfController {
   downloadPdf = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { filename } = req.params;
-      const outputDir = path.join(process.cwd(), 'outputs');
-      const filePath = path.join(outputDir, filename);
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-      res.sendFile(path.resolve(filePath));
+      const key = `outputs/${filename}`;
+      const downloadUrl = await this.storageService.getPresignedDownloadUrl(key, filename);
+      res.redirect(downloadUrl);
     } catch (err) {
       next(err);
     }
