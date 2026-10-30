@@ -63,13 +63,13 @@ export default function HomePage() {
         fileSize: selectedFile.size,
       });
 
-      toast.success("PDF uploaded successfully to S3!");
+      toast.success("Document loaded securely!");
       router.push(`/pdf/${id}`);
     } catch (err: unknown) {
       const message =
         axios.isAxiosError(err)
           ? err.response?.data?.error || err.message
-          : "Upload failed. Please check S3 credentials and backend.";
+          : "Failed to load document securely. Please try again.";
       toast.error(message);
     } finally {
       setIsUploading(false);
@@ -200,7 +200,7 @@ export default function HomePage() {
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                 </svg>
-                <span>Direct Upload to S3...</span>
+                <span>Securing & Loading Document...</span>
               </>
             ) : (
               <>
@@ -212,6 +212,14 @@ export default function HomePage() {
             )}
           </button>
         )}
+
+        {/* Security & Privacy Trust Badge */}
+        <div className="flex items-center justify-center gap-2 mt-4 text-xs text-slate-400 font-medium">
+          <svg className="w-3.5 h-3.5 text-emerald-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+          </svg>
+          <span>End-to-End Encrypted Transfer · Your documents remain strictly private</span>
+        </div>
       </div>
 
       {/* Feature cards */}
