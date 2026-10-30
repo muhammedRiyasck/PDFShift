@@ -1,8 +1,8 @@
 export interface PdfDocument {
   id: string;
   originalName: string;
-  filename: string;
+  s3Key: string;
   pageCount: number;
   uploadedAt: Date;
-  filePath: string;
+  fileSize?: number;
 }

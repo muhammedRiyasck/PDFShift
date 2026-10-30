@@ -1,20 +1,16 @@
 import { PDFDocument } from 'pdf-lib';
-import fs from 'fs/promises';
 
 export class PdfLibService {
-  async getPageCount(filePath: string): Promise<number> {
-    const fileBuffer = await fs.readFile(filePath);
+  async getPageCount(fileBuffer: Buffer): Promise<number> {
     const pdfDoc = await PDFDocument.load(fileBuffer);
     return pdfDoc.getPageCount();
   }
 
   async extractPages(
-    sourcePath: string,
-    pages: number[],  // 1-indexed
-    outputPath: string
-  ): Promise<void> {
-    const fileBuffer = await fs.readFile(sourcePath);
-    const sourcePdf = await PDFDocument.load(fileBuffer);
+    sourceBuffer: Buffer,
+    pages: number[] // 1-indexed
+  ): Promise<Uint8Array> {
+    const sourcePdf = await PDFDocument.load(sourceBuffer);
     const newPdf = await PDFDocument.create();
 
     for (const pageNum of pages) {
@@ -22,7 +18,6 @@ export class PdfLibService {
       newPdf.addPage(copiedPage);
     }
 
-    const pdfBytes = await newPdf.save();
-    await fs.writeFile(outputPath, pdfBytes);
+    return await newPdf.save();
   }
 }
