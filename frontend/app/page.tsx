@@ -4,6 +4,7 @@ import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
 import toast from "react-hot-toast";
+import { API_BASE } from "@/lib/config";
 
 export default function HomePage() {
   const router = useRouter();
@@ -39,20 +40,36 @@ export default function HomePage() {
     if (!selectedFile) return;
     setIsUploading(true);
     try {
-      const formData = new FormData();
-      formData.append("pdf", selectedFile);
-      const response = await axios.post(
-        "http://localhost:4000/api/upload",
-        formData,
-        { headers: { "Content-Type": "multipart/form-data" } }
-      );
-      toast.success("PDF uploaded successfully!");
-      router.push(`/pdf/${response.data.id}`);
+      // 1. Request presigned upload URL from backend
+      const presignRes = await axios.post(`${API_BASE}/api/presign-upload`, {
+        filename: selectedFile.name,
+        contentType: selectedFile.type || "application/pdf",
+      });
+
+      const { id, uploadUrl, s3Key } = presignRes.data;
+
+      // 2. Direct upload to AWS S3 via PUT (zero backend bottleneck)
+      await axios.put(uploadUrl, selectedFile, {
+        headers: {
+          "Content-Type": selectedFile.type || "application/pdf",
+        },
+      });
+
+      // 3. Confirm upload with backend to register metadata & page count
+      await axios.post(`${API_BASE}/api/confirm-upload`, {
+        id,
+        s3Key,
+        originalName: selectedFile.name,
+        fileSize: selectedFile.size,
+      });
+
+      toast.success("PDF uploaded successfully to S3!");
+      router.push(`/pdf/${id}`);
     } catch (err: unknown) {
       const message =
         axios.isAxiosError(err)
           ? err.response?.data?.error || err.message
-          : "Upload failed. Please check if the backend server is running.";
+          : "Upload failed. Please check S3 credentials and backend.";
       toast.error(message);
     } finally {
       setIsUploading(false);
@@ -183,7 +200,7 @@ export default function HomePage() {
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                 </svg>
-                <span>Processing & Uploading...</span>
+                <span>Direct Upload to S3...</span>
               </>
             ) : (
               <>

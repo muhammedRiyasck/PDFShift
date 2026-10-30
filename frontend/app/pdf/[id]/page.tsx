@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import axios from "axios";
 import toast from "react-hot-toast";
+import { API_BASE } from "@/lib/config";
 import dynamic from "next/dynamic";
 import {
   DndContext,
@@ -96,9 +97,9 @@ export default function PdfViewerPage() {
   useEffect(() => {
     const fetchInfo = async () => {
       try {
-        const res = await axios.get(`http://localhost:4000/api/pdf/${id}/info`);
+        const res = await axios.get(`${API_BASE}/api/pdf/${id}/info`);
         setPdfInfo(res.data);
-        setPdfUrl(`http://localhost:4000/api/pdf/${id}/file`);
+        setPdfUrl(`${API_BASE}/api/pdf/${id}/file`);
       } catch {
         toast.error("PDF not found");
         router.push("/");
@@ -147,10 +148,10 @@ export default function PdfViewerPage() {
     setIsExtracting(true);
     setDownloadUrl(null);
     try {
-      const res = await axios.post(`http://localhost:4000/api/pdf/${id}/extract`, {
+      const res = await axios.post(`${API_BASE}/api/pdf/${id}/extract`, {
         pages: selectedPages,
       });
-      const url = `http://localhost:4000${res.data.downloadUrl}`;
+      const url = res.data.downloadUrl.startsWith("http") ? res.data.downloadUrl : `${API_BASE}${res.data.downloadUrl}`;
       setDownloadUrl(url);
       setExtractedCount(selectedPages.length);
 
