@@ -94,12 +94,17 @@ export default function PDFPageThumbnail({ pdfUrl, pageNumber }: PDFPageThumbnai
     <div ref={containerRef} className="w-full aspect-[3/4] flex items-start justify-center overflow-hidden bg-slate-900">
       <Document
         file={pdfUrl}
-        onLoadError={() => setError(true)}
+        suspense={false}
+        onLoadError={(err) => {
+          console.error("PDF thumbnail load error:", err);
+          setError(true);
+        }}
         loading={<div className="w-full aspect-[3/4]"><PageSkeleton /></div>}
       >
         <Page
           pageNumber={pageNumber}
           width={containerWidth}
+          suspense={false}
           renderTextLayer={false}
           renderAnnotationLayer={false}
           loading={<div className="w-full aspect-[3/4]"><PageSkeleton /></div>}

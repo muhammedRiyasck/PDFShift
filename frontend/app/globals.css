@@ -11,15 +11,15 @@ body {
   min-height: 100vh;
 }
 
-@layer base {
-  /* Ensure interactive elements always show pointer cursor */
-  button,
-  [role="button"],
-  a,
-  label[for],
-  select {
-    cursor: pointer;
-  }
+/* Ensure all buttons have pointer cursor by default across the entire app */
+button,
+[role="button"] {
+  cursor: pointer;
+}
+
+button:disabled,
+[role="button"]:disabled {
+  cursor: not-allowed;
 }
 
 /* Custom scrollbar */

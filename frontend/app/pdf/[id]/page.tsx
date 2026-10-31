@@ -25,6 +25,23 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import PDFIcon from "@/components/PDFIcon";
 
+interface PdfInfo {
+  id: string;
+  originalName: string;
+  pageCount: number;
+}
+
+interface SortablePageItemProps {
+  page: number;
+  index: number;
+  onRemove: (page: number) => void;
+  onPreview: (page: number) => void;
+}
+
+const PDFPreviewModal = dynamic(() => import("@/components/PDFPreviewModal"), {
+  ssr: false,
+});
+
 const PDFPageThumbnail = dynamic(() => import("@/components/PDFPageThumbnail"), {
   ssr: false,
   loading: () => (
@@ -40,19 +57,9 @@ const PDFPageThumbnail = dynamic(() => import("@/components/PDFPageThumbnail"), 
   ),
 });
 
-interface PdfInfo {
-  id: string;
-  originalName: string;
-  pageCount: number;
-}
 
-interface SortablePageItemProps {
-  page: number;
-  index: number;
-  onRemove: (page: number) => void;
-}
 
-function SortablePageItem({ page, index, onRemove }: SortablePageItemProps) {
+function SortablePageItem({ page, index, onRemove, onPreview }: SortablePageItemProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: page });
 
@@ -68,17 +75,27 @@ function SortablePageItem({ page, index, onRemove }: SortablePageItemProps) {
       <div
         {...attributes}
         {...listeners}
-        className="w-14 h-14 rounded-xl bg-slate-800 border border-slate-700 hover:border-indigo-500/60 hover:bg-indigo-600/10 flex flex-col items-center justify-center cursor-grab active:cursor-grabbing transition-all select-none shadow-sm"
+        onClick={() => onPreview(page)}
+        title="Drag to rearrange, or click to preview"
+        className="w-14 h-14 rounded-xl bg-slate-800 border border-slate-700 hover:border-indigo-500/60 hover:bg-indigo-600/10 flex flex-col items-center justify-center cursor-grab active:cursor-grabbing transition-all select-none shadow-sm relative group"
       >
         <span className="text-[9px] text-slate-500 font-semibold uppercase tracking-wide leading-none mb-1">#{index + 1}</span>
         <span className="text-white font-bold text-sm leading-none">p{page}</span>
+
+        {/* Quick preview icon on hover */}
+        <div className="absolute inset-0 rounded-xl bg-slate-900/80 backdrop-blur-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+          <svg className="w-4 h-4 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+          </svg>
+        </div>
       </div>
       {/* Remove badge */}
       <button
         type="button"
         onClick={(e) => { e.stopPropagation(); onRemove(page); }}
         aria-label={`Remove page ${page}`}
-        className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-rose-500 hover:bg-rose-400 active:scale-90 text-white flex items-center justify-center shadow-md transition-all opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
+        className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-rose-500 hover:bg-rose-400 active:scale-90 text-white flex items-center justify-center shadow-md transition-all opacity-100 sm:opacity-0 sm:group-hover:opacity-100 z-10"
       >
         <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -100,6 +117,15 @@ export default function PdfViewerPage() {
   const [loading, setLoading] = useState(true);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [extractedCount, setExtractedCount] = useState<number>(0);
+  const [previewModalOpen, setPreviewModalOpen] = useState(false);
+  const [previewPage, setPreviewPage] = useState<number>(1);
+  const [previewMode, setPreviewMode] = useState<"all" | "selected">("all");
+
+  const openPreview = useCallback((pageNum: number, mode: "all" | "selected" = "all") => {
+    setPreviewPage(pageNum);
+    setPreviewMode(mode);
+    setPreviewModalOpen(true);
+  }, []);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -299,11 +325,22 @@ export default function PdfViewerPage() {
             <button
               onClick={handleExtract}
               disabled={isExtracting || !hasSelection}
-              className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all
-                ${hasSelection && !isExtracting
-                  ? "bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white shadow-lg shadow-indigo-600/25 hover:shadow-indigo-500/35"
-                  : "bg-slate-800/80 border border-slate-700/80 text-slate-500 cursor-not-allowed"
-                }`}
+             className={`relative inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl
+              overflow-hidden
+              border backdrop-blur-xl
+              text-sm font-semibold
+              transition-all duration-300 ease-out
+              ${
+                hasSelection && !isExtracting
+                  ? "bg-gradient-to-b from-indigo-500/25 to-indigo-700/20 border-indigo-400/40 text-indigo-100 shadow-[0_4px_20px_rgba(99,102,241,0.18)] hover:from-indigo-400/35 hover:to-indigo-600/30 hover:border-indigo-300/60 hover:text-white hover:shadow-[0_4px_25px_rgba(99,102,241,0.35)] hover:-translate-y-0.5 active:translate-y-0"
+                  : "bg-slate-800/40 border-white/5 text-slate-500 opacity-60 cursor-not-allowed"
+              }
+              before:absolute before:inset-0
+              before:bg-gradient-to-r before:from-transparent before:via-white/15 before:to-transparent
+              before:-translate-x-full
+              before:transition-transform before:duration-700
+              enabled:hover:before:translate-x-full
+              disabled:cursor-not-allowed`}
             >
               {isExtracting ? (
                 <>
@@ -333,24 +370,60 @@ export default function PdfViewerPage() {
         </div>
 
         {/* ── Reorder strip (when pages are selected) ────────────── */}
-        {  (
-          <div className="border-t  border-slate-800/60 bg-slate-900/60 px-4 sm:px-6 py-3 my-2">
+        { (
+          <div className="border-t border-slate-800/60 bg-slate-900/60 px-4 sm:px-6 py-3 my-2">
             <div className="max-w-7xl mx-auto">
               <div className="flex items-center justify-between my-2.5">
                 <div className="flex items-center gap-2">
-                  <svg className="w-3.5 h-3.5 text-indigo-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="w-7 h-7 text-indigo-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
                   </svg>
-                  <span className="text-sm font-semibold text-slate-300">Page order</span>
-                  <span className="text-xs text-slate-500">— drag to rearrange</span>
+                  <span className="text-md font-semibold text-slate-300">Page order</span>
+                  <span className="text-sm font-semibold text-slate-400 hidden sm:inline">— drag to rearrange</span>
                 </div>
-               
+                
+                {/* Preview Selected sequence button */}
+                {hasSelection && <button
+                  type="button"
+                  onClick={() => openPreview(selectedPages[0], "selected")}
+                  className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-indigo-600/15 border border-indigo-500/30 text-indigo-300 hover:bg-indigo-600/20 hover:text-indigo-400 transition-all font-medium active:scale-95 shadow-sm"
+                >
+                   <svg
+                      className="w-3.5 h-3.5"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.7"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <rect x="5" y="3" width="14" height="18" rx="1.5" />
+                      <path d="M8 7h8M8 10h8M8 13h5" />
+                      <circle cx="16" cy="17" r="3" />
+                      <path d="m18.2 19.2 1.5 1.5" />
+                    </svg>
+                  <span>Preview Selected ({selectedPages.length})</span>
+                </button>}
               </div>
+              {!hasSelection&&<div className="flex flex-col items-center justify-center  px-4 text-center">
+                  <div className=" flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-slate-800/60 shadow-inner">
+                    <span className="text-xl text-slate-400">▤</span>
+                  </div>
+                  <p className="text-sm font-semibold tracking-tight text-slate-200">
+                    No Page Selected
+                  </p>
+                  </div>}
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                 <SortableContext items={selectedPages} strategy={horizontalListSortingStrategy}>
-                  <div className="flex gap-2 pb-1 pt-2 px-1">
+                  <div className="flex gap-2 justify-center px-4 py-2 mt-2 overflow-x-auto scrollbar-none">
                     {selectedPages.map((page, index) => (
-                      <SortablePageItem key={page} page={page} index={index} onRemove={removePage} />
+                      <SortablePageItem
+                        key={page}
+                        page={page}
+                        index={index}
+                        onRemove={removePage}
+                        onPreview={(p) => openPreview(p, "selected")}
+                      />
                     ))}
                   </div>
                 </SortableContext>
@@ -490,19 +563,63 @@ export default function PdfViewerPage() {
                   <PDFPageThumbnail pdfUrl={pdfUrl} pageNumber={pageNum} />
                 </div>
 
-                {/* Page label */}
-                <div className={`py-1.5 text-center text-xs font-medium tracking-wide transition-colors
+                {/* Page label with preview icon */}
+                <div className={`px-2.5 py-1.5 flex items-center justify-between text-xs font-medium tracking-wide transition-colors
                   ${isSelected
-                    ? "bg-indigo-600/90 text-white"
-                    : "bg-slate-900 text-slate-500 group-hover:text-slate-300"}`}
+                    ? "bg-indigo-600 text-white"
+                    : "bg-slate-900 text-slate-400 group-hover:text-slate-200"}`}
                 >
-                  Page {pageNum}
+                  <span>Page {pageNum}</span>
+                 <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openPreview(pageNum, "all");
+                    }}
+                    title={`Preview page ${pageNum}`}
+                    className={`relative z-20 p-2 rounded-md outline
+                      transform-gpu transition-transform duration-200 ease-out
+                      hover:scale-125 active:scale-90
+                      ${
+                        isSelected
+                          ? "text-indigo-200 hover:text-white hover:bg-indigo-500"
+                          : "text-slate-400 hover:text-white-400 hover:bg-indigo-950"
+                      }`}
+                  >
+                    <svg
+                      className="w-3.5 h-3.5"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.7"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <rect x="5" y="3" width="14" height="18" rx="1.5" />
+                      <path d="M8 7h8M8 10h8M8 13h5" />
+                      <circle cx="16" cy="17" r="3" />
+                      <path d="m18.2 19.2 1.5 1.5" />
+                    </svg>
+                  </button>
                 </div>
               </div>
             );
           })}
         </div>
       </main>
+
+      {/* ── Page Preview Lightbox Modal ────────────────────────────── */}
+      <PDFPreviewModal
+        isOpen={previewModalOpen}
+        onClose={() => setPreviewModalOpen(false)}
+        pdfUrl={pdfUrl}
+        totalPages={pdfInfo.pageCount}
+        currentPage={previewPage}
+        onPageChange={setPreviewPage}
+        selectedPages={selectedPages}
+        onToggleSelect={togglePage}
+        initialMode={previewMode}
+      />
     </div>
   );
 }
