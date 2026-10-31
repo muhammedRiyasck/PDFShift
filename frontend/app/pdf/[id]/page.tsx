@@ -120,6 +120,28 @@ export default function PdfViewerPage() {
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
   const [previewPage, setPreviewPage] = useState<number>(1);
   const [previewMode, setPreviewMode] = useState<"all" | "selected">("all");
+  const [pageRotations, setPageRotations] = useState<Record<number, number>>({});
+
+  // Watermark state
+  const [showWatermarkModal, setShowWatermarkModal] = useState(false);
+  const [watermarkEnabled, setWatermarkEnabled] = useState(false);
+  const [watermarkText, setWatermarkText] = useState("CONFIDENTIAL");
+  const [watermarkOpacity, setWatermarkOpacity] = useState(0.25);
+  const [watermarkColor, setWatermarkColor] = useState<"red" | "gray" | "blue">("red");
+
+  const rotatePage = useCallback((pageNum: number, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setPageRotations((prev) => {
+      const current = prev[pageNum] || 0;
+      const nextAngle = (current + 90) % 360;
+      if (nextAngle === 0) {
+        const copy = { ...prev };
+        delete copy[pageNum];
+        return copy;
+      }
+      return { ...prev, [pageNum]: nextAngle };
+    });
+  }, []);
 
   const openPreview = useCallback((pageNum: number, mode: "all" | "selected" = "all") => {
     setPreviewPage(pageNum);
@@ -184,7 +206,25 @@ export default function PdfViewerPage() {
     setIsExtracting(true);
     setDownloadUrl(null);
     try {
-      const res = await axios.post(`${API_BASE}/api/pdf/${id}/extract`, { pages: selectedPages });
+      const colorMap = {
+        red: { r: 0.85, g: 0.15, b: 0.15 },
+        gray: { r: 0.35, g: 0.35, b: 0.4 },
+        blue: { r: 0.15, g: 0.35, b: 0.85 },
+      };
+
+      const payload = {
+        pages: selectedPages,
+        pageRotations: Object.keys(pageRotations).length > 0 ? pageRotations : undefined,
+        watermark: watermarkEnabled && watermarkText.trim()
+          ? {
+              text: watermarkText.trim(),
+              opacity: watermarkOpacity,
+              color: colorMap[watermarkColor],
+            }
+          : undefined,
+      };
+
+      const res = await axios.post(`${API_BASE}/api/pdf/${id}/extract`, payload);
       const url = res.data.downloadUrl.startsWith("http")
         ? res.data.downloadUrl
         : `${API_BASE}${res.data.downloadUrl}`;
@@ -320,6 +360,25 @@ export default function PdfViewerPage() {
                 Clear
               </button>
             )}
+
+            {/* Watermark / Stamp Option button */}
+            <button
+              onClick={() => setShowWatermarkModal(true)}
+              title="Add a watermark stamp (e.g., CONFIDENTIAL, DRAFT)"
+              className={`inline-flex items-center gap-1.5 text-sm px-3.5 py-2 rounded-xl border transition-all font-medium active:scale-[0.98] ${
+                watermarkEnabled
+                  ? "bg-amber-500/15 border-amber-500/50 text-amber-300 shadow-sm shadow-amber-500/20"
+                  : "border-slate-700/80 bg-slate-900/50 text-slate-300 hover:bg-slate-800 hover:border-slate-600 hover:text-white"
+              }`}
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <span>Stamp</span>
+              {watermarkEnabled && (
+                <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse ml-0.5" />
+              )}
+            </button>
 
             {/* Extract button */}
             <button
@@ -523,6 +582,8 @@ export default function PdfViewerPage() {
           {Array.from({ length: pdfInfo.pageCount }, (_, i) => i + 1).map((pageNum) => {
             const isSelected = selectedPages.includes(pageNum);
             const selectionIndex = selectedPages.indexOf(pageNum);
+            const rotation = pageRotations[pageNum] || 0;
+
             return (
               <div
                 key={pageNum}
@@ -553,6 +614,14 @@ export default function PdfViewerPage() {
                   )}
                 </div>
 
+                {/* Rotation indicator badge */}
+                {rotation > 0 && (
+                  <div className="absolute top-2 left-9 z-10 px-1.5 py-0.5 rounded bg-indigo-900/90 border border-indigo-500/60 text-[10px] text-indigo-200 font-mono font-bold shadow-md flex items-center gap-1">
+                    <span>⟳</span>
+                    <span>{rotation}°</span>
+                  </div>
+                )}
+
                 {/* Hover overlay for unselected */}
                 {!isSelected && (
                   <div className="absolute inset-0 z-[5] bg-indigo-600/0 group-hover:bg-indigo-600/5 transition-colors" />
@@ -560,47 +629,67 @@ export default function PdfViewerPage() {
 
                 {/* PDF thumbnail */}
                 <div className="bg-slate-900">
-                  <PDFPageThumbnail pdfUrl={pdfUrl} pageNumber={pageNum} />
+                  <PDFPageThumbnail
+                    pdfUrl={pdfUrl}
+                    pageNumber={pageNum}
+                    rotation={rotation}
+                  />
                 </div>
 
-                {/* Page label with preview icon */}
+                {/* Page label with rotate and preview icons */}
                 <div className={`px-2.5 py-1.5 flex items-center justify-between text-xs font-medium tracking-wide transition-colors
                   ${isSelected
                     ? "bg-indigo-600 text-white"
                     : "bg-slate-900 text-slate-400 group-hover:text-slate-200"}`}
                 >
                   <span>Page {pageNum}</span>
-                 <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      openPreview(pageNum, "all");
-                    }}
-                    title={`Preview page ${pageNum}`}
-                    className={`relative z-20 p-2 rounded-md outline
-                      transform-gpu transition-transform duration-200 ease-out
-                      hover:scale-125 active:scale-90
-                      ${
+                  <div className="flex items-center gap-0.5">
+                    {/* Quick rotate button */}
+                    <button
+                      type="button"
+                      onClick={(e) => rotatePage(pageNum, e)}
+                      title={`Rotate page ${pageNum} by 90° (Permanent on export)`}
+                      className={`relative z-20 p-1.5 rounded-md transform-gpu transition-all duration-150 active:scale-90 ${
                         isSelected
                           ? "text-indigo-200 hover:text-white hover:bg-indigo-500"
-                          : "text-slate-400 hover:text-white-400 hover:bg-indigo-950"
+                          : "text-slate-400 hover:text-white hover:bg-slate-800"
                       }`}
-                  >
-                    <svg
-                      className="w-3.5 h-3.5"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.7"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
                     >
-                      <rect x="5" y="3" width="14" height="18" rx="1.5" />
-                      <path d="M8 7h8M8 10h8M8 13h5" />
-                      <circle cx="16" cy="17" r="3" />
-                      <path d="m18.2 19.2 1.5 1.5" />
-                    </svg>
-                  </button>
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                    </button>
+
+                    {/* Preview button */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openPreview(pageNum, "all");
+                      }}
+                      title={`Preview page ${pageNum}`}
+                      className={`relative z-20 p-1.5 rounded-md transform-gpu transition-all duration-150 active:scale-90 ${
+                        isSelected
+                          ? "text-indigo-200 hover:text-white hover:bg-indigo-500"
+                          : "text-slate-400 hover:text-white hover:bg-slate-800"
+                      }`}
+                    >
+                      <svg
+                        className="w-3.5 h-3.5"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.7"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <rect x="5" y="3" width="14" height="18" rx="1.5" />
+                        <path d="M8 7h8M8 10h8M8 13h5" />
+                        <circle cx="16" cy="17" r="3" />
+                        <path d="m18.2 19.2 1.5 1.5" />
+                      </svg>
+                    </button>
+                  </div>
                 </div>
               </div>
             );
@@ -619,7 +708,187 @@ export default function PdfViewerPage() {
         selectedPages={selectedPages}
         onToggleSelect={togglePage}
         initialMode={previewMode}
+        pageRotations={pageRotations}
+        onRotatePage={(p) => rotatePage(p)}
       />
+
+      {/* ── Watermark & Stamp Modal ─────────────────────────────────── */}
+      {showWatermarkModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-slate-900 border border-slate-700/80 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-white font-bold text-base leading-tight">Stamp & Watermark</h3>
+                  <p className="text-slate-400 text-xs">Stamped permanently on extracted PDF</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowWatermarkModal(false)}
+                className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-all"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 space-y-5">
+              {/* Enable / Disable toggle */}
+              <div className="flex items-center justify-between p-3.5 rounded-xl bg-slate-950/60 border border-slate-800">
+                <div>
+                  <span className="text-white text-sm font-semibold block">Enable Watermark Stamp</span>
+                  <span className="text-slate-500 text-xs">Print diagonal stamp across each page</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setWatermarkEnabled(!watermarkEnabled)}
+                  className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors duration-200 ease-in-out ${
+                    watermarkEnabled ? "bg-amber-500" : "bg-slate-700"
+                  }`}
+                >
+                  <div
+                    className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-200 ease-in-out ${
+                      watermarkEnabled ? "translate-x-6" : "translate-x-0"
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {watermarkEnabled && (
+                <>
+                  {/* Presets */}
+                  <div>
+                    <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-2">
+                      Quick Presets
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {["CONFIDENTIAL", "DRAFT", "DO NOT COPY", "SAMPLE", "APPROVED"].map((preset) => (
+                        <button
+                          key={preset}
+                          type="button"
+                          onClick={() => setWatermarkText(preset)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                            watermarkText === preset
+                              ? "bg-amber-500/20 text-amber-300 border border-amber-500/50 shadow-sm"
+                              : "bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white border border-transparent"
+                          }`}
+                        >
+                          {preset}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Custom Text input */}
+                  <div>
+                    <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-2">
+                      Stamp Text
+                    </label>
+                    <input
+                      type="text"
+                      value={watermarkText}
+                      onChange={(e) => setWatermarkText(e.target.value)}
+                      placeholder="e.g. CONFIDENTIAL"
+                      maxLength={30}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-sm focus:outline-none focus:border-amber-500/80 transition-colors uppercase font-mono tracking-wider"
+                    />
+                  </div>
+
+                  {/* Color & Opacity row */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-2">
+                        Stamp Color
+                      </label>
+                      <div className="flex gap-2">
+                        {[
+                          { id: "red", label: "Red", bg: "bg-rose-500" },
+                          { id: "gray", label: "Gray", bg: "bg-slate-400" },
+                          { id: "blue", label: "Blue", bg: "bg-blue-500" },
+                        ].map((c) => (
+                          <button
+                            key={c.id}
+                            type="button"
+                            onClick={() => setWatermarkColor(c.id as "red" | "gray" | "blue")}
+                            className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-medium border flex items-center justify-center gap-1.5 transition-all ${
+                              watermarkColor === c.id
+                                ? "border-amber-500/80 bg-slate-800 text-white shadow-sm"
+                                : "border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700"
+                            }`}
+                          >
+                            <span className={`w-2.5 h-2.5 rounded-full ${c.bg}`} />
+                            <span>{c.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-2">
+                        Opacity ({Math.round(watermarkOpacity * 100)}%)
+                      </label>
+                      <input
+                        type="range"
+                        min="0.10"
+                        max="0.60"
+                        step="0.05"
+                        value={watermarkOpacity}
+                        onChange={(e) => setWatermarkOpacity(parseFloat(e.target.value))}
+                        className="w-full accent-amber-500 mt-2 cursor-pointer"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Live preview box */}
+                  <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-center relative overflow-hidden h-24 select-none">
+                    <div className="absolute inset-0 flex flex-col gap-2 p-3 opacity-20 pointer-events-none">
+                      <div className="w-1/2 h-2 rounded bg-slate-500" />
+                      <div className="w-full h-1.5 rounded bg-slate-600" />
+                      <div className="w-3/4 h-1.5 rounded bg-slate-600" />
+                      <div className="w-5/6 h-1.5 rounded bg-slate-600" />
+                    </div>
+                    <span
+                      style={{
+                        transform: "rotate(-20deg)",
+                        opacity: watermarkOpacity,
+                        color:
+                          watermarkColor === "red"
+                            ? "#ef4444"
+                            : watermarkColor === "blue"
+                            ? "#3b82f6"
+                            : "#94a3b8",
+                      }}
+                      className="font-black text-lg tracking-widest uppercase border-2 px-3 py-1 rounded"
+                    >
+                      {watermarkText || "WATERMARK"}
+                    </span>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 bg-slate-950/80 border-t border-slate-800 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowWatermarkModal(false)}
+                className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold transition-all shadow-md active:scale-95"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

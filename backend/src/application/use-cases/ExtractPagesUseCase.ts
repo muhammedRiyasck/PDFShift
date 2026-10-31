@@ -1,6 +1,6 @@
 import { IPdfRepository } from '../../domain/repositories/IPdfRepository';
 import { IStorageService } from '../../domain/services/IStorageService';
-import { PdfLibService } from '../../infrastructure/pdf/PdfLibService';
+import { PdfLibService, WatermarkOptions } from '../../infrastructure/pdf/PdfLibService';
 import { v4 as uuidv4 } from 'uuid';
 
 export interface ExtractResult {
@@ -16,7 +16,12 @@ export class ExtractPagesUseCase {
     private readonly pdfLibService: PdfLibService
   ) {}
 
-  async execute(pdfId: string, pages: number[]): Promise<ExtractResult> {
+  async execute(
+    pdfId: string,
+    pages: number[],
+    pageRotations?: Record<number, number>,
+    watermark?: WatermarkOptions
+  ): Promise<ExtractResult> {
     const doc = await this.pdfRepository.findById(pdfId);
     if (!doc) {
       throw new Error(`PDF with id "${pdfId}" not found`);
@@ -36,8 +41,13 @@ export class ExtractPagesUseCase {
     // 1. Fetch source PDF buffer from S3
     const sourceBuffer = await this.storageService.getFileBuffer(doc.s3Key);
 
-    // 2. Extract and reorder pages using pdf-lib
-    const extractedBytes = await this.pdfLibService.extractPages(sourceBuffer, pages);
+    // 2. Extract, rotate, and watermark pages using pdf-lib
+    const extractedBytes = await this.pdfLibService.extractPages(
+      sourceBuffer,
+      pages,
+      pageRotations,
+      watermark
+    );
 
     // 3. Upload extracted output directly to S3 outputs/
     const outputFilename = `extracted-${uuidv4()}.pdf`;

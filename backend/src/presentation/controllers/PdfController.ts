@@ -87,14 +87,18 @@ export class PdfController {
   extractPages = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { id } = req.params;
-      const { pages } = req.body as { pages: number[] };
+      const { pages, pageRotations, watermark } = req.body as {
+        pages: number[];
+        pageRotations?: Record<number, number>;
+        watermark?: { text: string; opacity?: number; color?: { r: number; g: number; b: number } };
+      };
 
       if (!Array.isArray(pages) || pages.length === 0) {
         res.status(400).json({ error: 'pages must be a non-empty array of page numbers' });
         return;
       }
 
-      const result = await this.extractPagesUseCase.execute(id, pages);
+      const result = await this.extractPagesUseCase.execute(id, pages, pageRotations, watermark);
       res.json({
         downloadUrl: result.downloadUrl,
         filename: result.filename,

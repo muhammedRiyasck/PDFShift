@@ -19,6 +19,8 @@ interface PDFPreviewModalProps {
   selectedPages: number[];
   onToggleSelect: (page: number) => void;
   initialMode?: "all" | "selected";
+  pageRotations?: Record<number, number>;
+  onRotatePage?: (page: number) => void;
 }
 
 export default function PDFPreviewModal({
@@ -31,9 +33,12 @@ export default function PDFPreviewModal({
   selectedPages,
   onToggleSelect,
   initialMode = "all",
+  pageRotations,
+  onRotatePage,
 }: PDFPreviewModalProps) {
   const [zoom, setZoom] = useState<number>(1);
-  const [rotation, setRotation] = useState<number>(0);
+  const [localRotation, setLocalRotation] = useState<number>(0);
+  const currentRotation = pageRotations ? (pageRotations[currentPage] || 0) : localRotation;
   const [mode, setMode] = useState<"all" | "selected">(initialMode);
   const [pageWidth, setPageWidth] = useState<number>(600);
   const [pageLoading, setPageLoading] = useState<boolean>(true);
@@ -83,7 +88,7 @@ export default function PDFPreviewModal({
     if (isOpen) {
       setMode(initialMode);
       setZoom(1);
-      setRotation(0);
+      setLocalRotation(0);
     }
   }, [isOpen, initialMode]);
 
@@ -140,7 +145,13 @@ export default function PDFPreviewModal({
   const handleZoomIn = () => setZoom((z) => Math.min(Number((z + 0.25).toFixed(2)), 2.5));
   const handleZoomOut = () => setZoom((z) => Math.max(Number((z - 0.25).toFixed(2)), 0.5));
   const handleResetZoom = () => setZoom(1);
-  const handleRotate = () => setRotation((r) => (r + 90) % 360);
+  const handleRotate = () => {
+    if (onRotatePage) {
+      onRotatePage(currentPage);
+    } else {
+      setLocalRotation((r) => (r + 90) % 360);
+    }
+  };
 
   // Keyboard navigation
   useEffect(() => {
@@ -412,7 +423,7 @@ export default function PDFPreviewModal({
               <Page
                 pageNumber={currentPage}
                 width={pageWidth}
-                rotate={rotation}
+                rotate={currentRotation}
                 suspense={false}
                 renderTextLayer={false}
                 renderAnnotationLayer={false}

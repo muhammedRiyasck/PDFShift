@@ -12,6 +12,7 @@ if (typeof window !== "undefined") {
 interface PDFPageThumbnailProps {
   pdfUrl: string;
   pageNumber: number;
+  rotation?: number;
 }
 
 /** Skeleton that mimics a document page — header block + text lines */
@@ -61,7 +62,11 @@ function PageError({ pageNumber }: { pageNumber: number }) {
   );
 }
 
-export default function PDFPageThumbnail({ pdfUrl, pageNumber }: PDFPageThumbnailProps) {
+export default function PDFPageThumbnail({
+  pdfUrl,
+  pageNumber,
+  rotation = 0,
+}: PDFPageThumbnailProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState<number>(180);
   const [error, setError] = useState(false);
@@ -104,6 +109,7 @@ export default function PDFPageThumbnail({ pdfUrl, pageNumber }: PDFPageThumbnai
         <Page
           pageNumber={pageNumber}
           width={containerWidth}
+          rotate={rotation || 0}
           suspense={false}
           renderTextLayer={false}
           renderAnnotationLayer={false}
