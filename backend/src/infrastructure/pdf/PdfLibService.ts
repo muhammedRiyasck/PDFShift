@@ -6,6 +6,12 @@ export interface WatermarkOptions {
   color?: { r: number; g: number; b: number };
 }
 
+export interface PageNumberingOptions {
+  enabled: boolean;
+  format?: 'page_n_of_total' | 'n_slash_total' | 'n_only'; // default 'page_n_of_total'
+  position?: 'bottom_center' | 'bottom_right' | 'bottom_left'; // default 'bottom_center'
+}
+
 export interface PDFAnnotation {
   pageNum: number;
   type: 'text' | 'redact';
@@ -30,7 +36,8 @@ export class PdfLibService {
     pages: number[], // 1-indexed
     pageRotations?: Record<number, number>,
     watermark?: WatermarkOptions,
-    annotations?: PDFAnnotation[]
+    annotations?: PDFAnnotation[],
+    pageNumbering?: PageNumberingOptions
   ): Promise<Uint8Array> {
     const sourcePdf = await PDFDocument.load(sourceBuffer);
     const newPdf = await PDFDocument.create();
@@ -126,12 +133,49 @@ export class PdfLibService {
       }
     }
 
+    // Apply page numbering if requested
+    if (pageNumbering && pageNumbering.enabled) {
+      const numFont = await newPdf.embedFont(StandardFonts.Helvetica);
+      const createdPages = newPdf.getPages();
+      const total = createdPages.length;
+
+      createdPages.forEach((page, idx) => {
+        const pNum = idx + 1;
+        let numStr = `Page ${pNum} of ${total}`;
+        if (pageNumbering.format === 'n_slash_total') {
+          numStr = `${pNum} / ${total}`;
+        } else if (pageNumbering.format === 'n_only') {
+          numStr = `${pNum}`;
+        }
+
+        const textSize = 10;
+        const textWidth = numFont.widthOfTextAtSize(numStr, textSize);
+        const { width } = page.getSize();
+        let posX = (width - textWidth) / 2;
+
+        if (pageNumbering.position === 'bottom_right') {
+          posX = width - textWidth - 36;
+        } else if (pageNumbering.position === 'bottom_left') {
+          posX = 36;
+        }
+
+        page.drawText(numStr, {
+          x: posX,
+          y: 20,
+          size: textSize,
+          font: numFont,
+          color: rgb(0.35, 0.35, 0.35),
+        });
+      });
+    }
+
     return await newPdf.save();
   }
 
   async mergePdfs(
     sourceBuffers: Buffer[],
-    watermark?: WatermarkOptions
+    watermark?: WatermarkOptions,
+    pageNumbering?: PageNumberingOptions
   ): Promise<Uint8Array> {
     const mergedPdf = await PDFDocument.create();
 
@@ -167,6 +211,42 @@ export class PdfLibService {
           rotate: degrees(35),
         });
       }
+    }
+
+    // Apply page numbering if requested
+    if (pageNumbering && pageNumbering.enabled) {
+      const numFont = await mergedPdf.embedFont(StandardFonts.Helvetica);
+      const createdPages = mergedPdf.getPages();
+      const total = createdPages.length;
+
+      createdPages.forEach((page, idx) => {
+        const pNum = idx + 1;
+        let numStr = `Page ${pNum} of ${total}`;
+        if (pageNumbering.format === 'n_slash_total') {
+          numStr = `${pNum} / ${total}`;
+        } else if (pageNumbering.format === 'n_only') {
+          numStr = `${pNum}`;
+        }
+
+        const textSize = 10;
+        const textWidth = numFont.widthOfTextAtSize(numStr, textSize);
+        const { width } = page.getSize();
+        let posX = (width - textWidth) / 2;
+
+        if (pageNumbering.position === 'bottom_right') {
+          posX = width - textWidth - 36;
+        } else if (pageNumbering.position === 'bottom_left') {
+          posX = 36;
+        }
+
+        page.drawText(numStr, {
+          x: posX,
+          y: 20,
+          size: textSize,
+          font: numFont,
+          color: rgb(0.35, 0.35, 0.35),
+        });
+      });
     }
 
     return await mergedPdf.save();

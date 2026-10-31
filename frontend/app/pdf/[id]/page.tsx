@@ -126,10 +126,16 @@ export default function PdfViewerPage() {
 
   // Watermark state
   const [showWatermarkModal, setShowWatermarkModal] = useState(false);
+  const [modalTab, setModalTab] = useState<"watermark" | "numbers">("watermark");
   const [watermarkEnabled, setWatermarkEnabled] = useState(false);
   const [watermarkText, setWatermarkText] = useState("CONFIDENTIAL");
   const [watermarkOpacity, setWatermarkOpacity] = useState(0.25);
   const [watermarkColor, setWatermarkColor] = useState<"red" | "gray" | "blue">("red");
+
+  // Page Numbers state
+  const [pageNumbersEnabled, setPageNumbersEnabled] = useState(false);
+  const [pageNumberFormat, setPageNumberFormat] = useState<"page_n_of_total" | "n_slash_total" | "n_only">("page_n_of_total");
+  const [pageNumberPosition, setPageNumberPosition] = useState<"bottom_center" | "bottom_right" | "bottom_left">("bottom_center");
 
   const rotatePage = useCallback((pageNum: number, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
@@ -225,6 +231,13 @@ export default function PdfViewerPage() {
             }
           : undefined,
         annotations: annotations.length > 0 ? annotations : undefined,
+        pageNumbering: pageNumbersEnabled
+          ? {
+              enabled: true,
+              format: pageNumberFormat,
+              position: pageNumberPosition,
+            }
+          : undefined,
       };
 
       const res = await axios.post(`${API_BASE}/api/pdf/${id}/extract`, payload);
@@ -364,12 +377,12 @@ export default function PdfViewerPage() {
               </button>
             )}
 
-            {/* Watermark / Stamp Option button */}
+            {/* Watermark / Stamp / Page Numbers Option button */}
             <button
               onClick={() => setShowWatermarkModal(true)}
-              title="Add a watermark stamp (e.g., CONFIDENTIAL, DRAFT)"
+              title="Add a watermark stamp or page numbers"
               className={`inline-flex items-center gap-1.5 text-sm px-3.5 py-2 rounded-xl border transition-all font-medium active:scale-[0.98] ${
-                watermarkEnabled
+                watermarkEnabled || pageNumbersEnabled
                   ? "bg-amber-500/15 border-amber-500/50 text-amber-300 shadow-sm shadow-amber-500/20"
                   : "border-slate-700/80 bg-slate-900/50 text-slate-300 hover:bg-slate-800 hover:border-slate-600 hover:text-white"
               }`}
@@ -377,8 +390,8 @@ export default function PdfViewerPage() {
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
-              <span>Stamp</span>
-              {watermarkEnabled && (
+              <span>Stamp & Numbers</span>
+              {(watermarkEnabled || pageNumbersEnabled) && (
                 <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse ml-0.5" />
               )}
             </button>
@@ -729,7 +742,7 @@ export default function PdfViewerPage() {
         onUpdateAnnotations={setAnnotations}
       />
 
-      {/* ── Watermark & Stamp Modal ─────────────────────────────────── */}
+      {/* ── Watermark, Stamp & Page Numbers Modal ──────────────────── */}
       {showWatermarkModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
           <div className="bg-slate-900 border border-slate-700/80 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
@@ -742,14 +755,14 @@ export default function PdfViewerPage() {
                   </svg>
                 </div>
                 <div>
-                  <h3 className="text-white font-bold text-base leading-tight">Stamp & Watermark</h3>
-                  <p className="text-slate-400 text-xs">Stamped permanently on extracted PDF</p>
+                  <h3 className="text-white font-bold text-base leading-tight">Export Enhancements</h3>
+                  <p className="text-slate-400 text-xs">Stamp watermarks or page numbers on export</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setShowWatermarkModal(false)}
-                className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-all"
+                className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-all cursor-pointer"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -757,138 +770,275 @@ export default function PdfViewerPage() {
               </button>
             </div>
 
+            {/* Modal Sub-tabs */}
+            <div className="px-6 pt-3 pb-1 border-b border-slate-800/80 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setModalTab("watermark")}
+                className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                  modalTab === "watermark"
+                    ? "bg-indigo-600 text-white shadow-sm"
+                    : "bg-slate-950/40 text-slate-400 hover:text-white"
+                }`}
+              >
+                Watermark Stamp {watermarkEnabled && "•"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setModalTab("numbers")}
+                className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                  modalTab === "numbers"
+                    ? "bg-indigo-600 text-white shadow-sm"
+                    : "bg-slate-950/40 text-slate-400 hover:text-white"
+                }`}
+              >
+                Page Numbers {pageNumbersEnabled && "•"}
+              </button>
+            </div>
+
             {/* Content */}
             <div className="p-6 space-y-5">
-              {/* Enable / Disable toggle */}
-              <div className="flex items-center justify-between p-3.5 rounded-xl bg-slate-950/60 border border-slate-800">
-                <div>
-                  <span className="text-white text-sm font-semibold block">Enable Watermark Stamp</span>
-                  <span className="text-slate-500 text-xs">Print diagonal stamp across each page</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setWatermarkEnabled(!watermarkEnabled)}
-                  className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors duration-200 ease-in-out ${
-                    watermarkEnabled ? "bg-amber-500" : "bg-slate-700"
-                  }`}
-                >
-                  <div
-                    className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-200 ease-in-out ${
-                      watermarkEnabled ? "translate-x-6" : "translate-x-0"
-                    }`}
-                  />
-                </button>
-              </div>
-
-              {watermarkEnabled && (
+              {modalTab === "watermark" && (
                 <>
-                  {/* Presets */}
-                  <div>
-                    <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-2">
-                      Quick Presets
-                    </label>
-                    <div className="flex flex-wrap gap-2">
-                      {["CONFIDENTIAL", "DRAFT", "DO NOT COPY", "SAMPLE", "APPROVED"].map((preset) => (
-                        <button
-                          key={preset}
-                          type="button"
-                          onClick={() => setWatermarkText(preset)}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                            watermarkText === preset
-                              ? "bg-amber-500/20 text-amber-300 border border-amber-500/50 shadow-sm"
-                              : "bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white border border-transparent"
+                  {/* Enable / Disable toggle */}
+                  <div className="flex items-center justify-between p-3.5 rounded-xl bg-slate-950/60 border border-slate-800">
+                    <div>
+                      <span className="text-white text-sm font-semibold block">Enable Watermark Stamp</span>
+                      <span className="text-slate-500 text-xs">Print diagonal stamp across each page</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setWatermarkEnabled(!watermarkEnabled)}
+                      className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors duration-200 ease-in-out cursor-pointer ${
+                        watermarkEnabled ? "bg-amber-500" : "bg-slate-700"
+                      }`}
+                    >
+                      <div
+                        className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-200 ease-in-out ${
+                          watermarkEnabled ? "translate-x-6" : "translate-x-0"
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  {watermarkEnabled && (
+                    <>
+                      {/* Presets */}
+                      <div>
+                        <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-2">
+                          Quick Presets
+                        </label>
+                        <div className="flex flex-wrap gap-2">
+                          {["CONFIDENTIAL", "DRAFT", "DO NOT COPY", "SAMPLE", "APPROVED"].map((preset) => (
+                            <button
+                              key={preset}
+                              type="button"
+                              onClick={() => setWatermarkText(preset)}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                                watermarkText === preset
+                                  ? "bg-amber-500/20 text-amber-300 border border-amber-500/50 shadow-sm"
+                                  : "bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white border border-transparent"
+                              }`}
+                            >
+                              {preset}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Custom Text input */}
+                      <div>
+                        <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-2">
+                          Stamp Text
+                        </label>
+                        <input
+                          type="text"
+                          value={watermarkText}
+                          onChange={(e) => setWatermarkText(e.target.value)}
+                          placeholder="e.g. CONFIDENTIAL"
+                          maxLength={30}
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-sm focus:outline-none focus:border-amber-500/80 transition-colors uppercase font-mono tracking-wider"
+                        />
+                      </div>
+
+                      {/* Color & Opacity row */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-2">
+                            Stamp Color
+                          </label>
+                          <div className="flex gap-2">
+                            {[
+                              { id: "red", label: "Red", bg: "bg-rose-500" },
+                              { id: "gray", label: "Gray", bg: "bg-slate-400" },
+                              { id: "blue", label: "Blue", bg: "bg-blue-500" },
+                            ].map((c) => (
+                              <button
+                                key={c.id}
+                                type="button"
+                                onClick={() => setWatermarkColor(c.id as "red" | "gray" | "blue")}
+                                className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-medium border flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                                  watermarkColor === c.id
+                                    ? "border-amber-500/80 bg-slate-800 text-white shadow-sm"
+                                    : "border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700"
+                                }`}
+                              >
+                                <span className={`w-2.5 h-2.5 rounded-full ${c.bg}`} />
+                                <span>{c.label}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-2">
+                            Opacity ({Math.round(watermarkOpacity * 100)}%)
+                          </label>
+                          <input
+                            type="range"
+                            min="0.10"
+                            max="0.60"
+                            step="0.05"
+                            value={watermarkOpacity}
+                            onChange={(e) => setWatermarkOpacity(parseFloat(e.target.value))}
+                            className="w-full accent-amber-500 mt-2 cursor-pointer"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Live preview box */}
+                      <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-center relative overflow-hidden h-24 select-none">
+                        <div className="absolute inset-0 flex flex-col gap-2 p-3 opacity-20 pointer-events-none">
+                          <div className="w-1/2 h-2 rounded bg-slate-500" />
+                          <div className="w-full h-1.5 rounded bg-slate-600" />
+                          <div className="w-3/4 h-1.5 rounded bg-slate-600" />
+                          <div className="w-5/6 h-1.5 rounded bg-slate-600" />
+                        </div>
+                        <span
+                          style={{
+                            transform: "rotate(-20deg)",
+                            opacity: watermarkOpacity,
+                            color:
+                              watermarkColor === "red"
+                                ? "#ef4444"
+                                : watermarkColor === "blue"
+                                ? "#3b82f6"
+                                : "#94a3b8",
+                          }}
+                          className="font-black text-lg tracking-widest uppercase border-2 px-3 py-1 rounded"
+                        >
+                          {watermarkText || "WATERMARK"}
+                        </span>
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
+
+              {modalTab === "numbers" && (
+                <>
+                  {/* Enable / Disable toggle */}
+                  <div className="flex items-center justify-between p-3.5 rounded-xl bg-slate-950/60 border border-slate-800">
+                    <div>
+                      <span className="text-white text-sm font-semibold block">Enable Page Numbers</span>
+                      <span className="text-slate-500 text-xs">Stamp clean numbers on every extracted page</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setPageNumbersEnabled(!pageNumbersEnabled)}
+                      className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors duration-200 ease-in-out cursor-pointer ${
+                        pageNumbersEnabled ? "bg-amber-500" : "bg-slate-700"
+                      }`}
+                    >
+                      <div
+                        className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-200 ease-in-out ${
+                          pageNumbersEnabled ? "translate-x-6" : "translate-x-0"
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  {pageNumbersEnabled && (
+                    <>
+                      {/* Format Selector */}
+                      <div>
+                        <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-2">
+                          Numbering Format
+                        </label>
+                        <div className="grid grid-cols-3 gap-2">
+                          {[
+                            { id: "page_n_of_total", label: "Page 1 of 5" },
+                            { id: "n_slash_total", label: "1 / 5" },
+                            { id: "n_only", label: "1" },
+                          ].map((fmt) => (
+                            <button
+                              key={fmt.id}
+                              type="button"
+                              onClick={() => setPageNumberFormat(fmt.id as any)}
+                              className={`py-2 px-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+                                pageNumberFormat === fmt.id
+                                  ? "bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-sm"
+                                  : "bg-slate-950/60 text-slate-400 border-slate-800 hover:border-slate-700"
+                              }`}
+                            >
+                              {fmt.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Position Selector */}
+                      <div>
+                        <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-2">
+                          Footer Position
+                        </label>
+                        <div className="grid grid-cols-3 gap-2">
+                          {[
+                            { id: "bottom_left", label: "Bottom Left" },
+                            { id: "bottom_center", label: "Bottom Center" },
+                            { id: "bottom_right", label: "Bottom Right" },
+                          ].map((pos) => (
+                            <button
+                              key={pos.id}
+                              type="button"
+                              onClick={() => setPageNumberPosition(pos.id as any)}
+                              className={`py-2 px-2 rounded-xl text-xs font-medium border transition-all cursor-pointer ${
+                                pageNumberPosition === pos.id
+                                  ? "bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-sm"
+                                  : "bg-slate-950/60 text-slate-400 border-slate-800 hover:border-slate-700"
+                              }`}
+                            >
+                              {pos.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Live Footer Preview */}
+                      <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 flex flex-col justify-between h-24 select-none relative">
+                        <div className="space-y-1.5 opacity-25">
+                          <div className="w-1/3 h-1.5 rounded bg-slate-600" />
+                          <div className="w-full h-1.5 rounded bg-slate-600" />
+                          <div className="w-3/4 h-1.5 rounded bg-slate-600" />
+                        </div>
+                        <div
+                          className={`text-xs font-mono font-medium text-slate-400 pt-2 border-t border-slate-800/80 flex ${
+                            pageNumberPosition === "bottom_left"
+                              ? "justify-start"
+                              : pageNumberPosition === "bottom_right"
+                              ? "justify-end"
+                              : "justify-center"
                           }`}
                         >
-                          {preset}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Custom Text input */}
-                  <div>
-                    <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-2">
-                      Stamp Text
-                    </label>
-                    <input
-                      type="text"
-                      value={watermarkText}
-                      onChange={(e) => setWatermarkText(e.target.value)}
-                      placeholder="e.g. CONFIDENTIAL"
-                      maxLength={30}
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-sm focus:outline-none focus:border-amber-500/80 transition-colors uppercase font-mono tracking-wider"
-                    />
-                  </div>
-
-                  {/* Color & Opacity row */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-2">
-                        Stamp Color
-                      </label>
-                      <div className="flex gap-2">
-                        {[
-                          { id: "red", label: "Red", bg: "bg-rose-500" },
-                          { id: "gray", label: "Gray", bg: "bg-slate-400" },
-                          { id: "blue", label: "Blue", bg: "bg-blue-500" },
-                        ].map((c) => (
-                          <button
-                            key={c.id}
-                            type="button"
-                            onClick={() => setWatermarkColor(c.id as "red" | "gray" | "blue")}
-                            className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-medium border flex items-center justify-center gap-1.5 transition-all ${
-                              watermarkColor === c.id
-                                ? "border-amber-500/80 bg-slate-800 text-white shadow-sm"
-                                : "border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700"
-                            }`}
-                          >
-                            <span className={`w-2.5 h-2.5 rounded-full ${c.bg}`} />
-                            <span>{c.label}</span>
-                          </button>
-                        ))}
+                          {pageNumberFormat === "page_n_of_total"
+                            ? `Page 1 of ${selectedPages.length || 1}`
+                            : pageNumberFormat === "n_slash_total"
+                            ? `1 / ${selectedPages.length || 1}`
+                            : "1"}
+                        </div>
                       </div>
-                    </div>
-
-                    <div>
-                      <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-2">
-                        Opacity ({Math.round(watermarkOpacity * 100)}%)
-                      </label>
-                      <input
-                        type="range"
-                        min="0.10"
-                        max="0.60"
-                        step="0.05"
-                        value={watermarkOpacity}
-                        onChange={(e) => setWatermarkOpacity(parseFloat(e.target.value))}
-                        className="w-full accent-amber-500 mt-2 cursor-pointer"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Live preview box */}
-                  <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-center relative overflow-hidden h-24 select-none">
-                    <div className="absolute inset-0 flex flex-col gap-2 p-3 opacity-20 pointer-events-none">
-                      <div className="w-1/2 h-2 rounded bg-slate-500" />
-                      <div className="w-full h-1.5 rounded bg-slate-600" />
-                      <div className="w-3/4 h-1.5 rounded bg-slate-600" />
-                      <div className="w-5/6 h-1.5 rounded bg-slate-600" />
-                    </div>
-                    <span
-                      style={{
-                        transform: "rotate(-20deg)",
-                        opacity: watermarkOpacity,
-                        color:
-                          watermarkColor === "red"
-                            ? "#ef4444"
-                            : watermarkColor === "blue"
-                            ? "#3b82f6"
-                            : "#94a3b8",
-                      }}
-                      className="font-black text-lg tracking-widest uppercase border-2 px-3 py-1 rounded"
-                    >
-                      {watermarkText || "WATERMARK"}
-                    </span>
-                  </div>
+                    </>
+                  )}
                 </>
               )}
             </div>

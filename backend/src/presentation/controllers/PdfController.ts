@@ -89,11 +89,16 @@ export class PdfController {
   extractPages = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { id } = req.params;
-      const { pages, pageRotations, watermark, annotations } = req.body as {
+      const { pages, pageRotations, watermark, annotations, pageNumbering } = req.body as {
         pages: number[];
         pageRotations?: Record<number, number>;
         watermark?: { text: string; opacity?: number; color?: { r: number; g: number; b: number } };
         annotations?: any[];
+        pageNumbering?: {
+          enabled: boolean;
+          format?: 'page_n_of_total' | 'n_slash_total' | 'n_only';
+          position?: 'bottom_center' | 'bottom_right' | 'bottom_left';
+        };
       };
 
       if (!Array.isArray(pages) || pages.length === 0) {
@@ -101,7 +106,14 @@ export class PdfController {
         return;
       }
 
-      const result = await this.extractPagesUseCase.execute(id, pages, pageRotations, watermark, annotations);
+      const result = await this.extractPagesUseCase.execute(
+        id,
+        pages,
+        pageRotations,
+        watermark,
+        annotations,
+        pageNumbering
+      );
       res.json({
         downloadUrl: result.downloadUrl,
         filename: result.filename,
@@ -113,9 +125,14 @@ export class PdfController {
 
   mergePdfs = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const { pdfIds, watermark } = req.body as {
+      const { pdfIds, watermark, pageNumbering } = req.body as {
         pdfIds: string[];
         watermark?: { text: string; opacity?: number; color?: { r: number; g: number; b: number } };
+        pageNumbering?: {
+          enabled: boolean;
+          format?: 'page_n_of_total' | 'n_slash_total' | 'n_only';
+          position?: 'bottom_center' | 'bottom_right' | 'bottom_left';
+        };
       };
 
       if (!Array.isArray(pdfIds) || pdfIds.length < 2) {
@@ -123,7 +140,7 @@ export class PdfController {
         return;
       }
 
-      const result = await this.mergePdfsUseCase.execute(pdfIds, watermark);
+      const result = await this.mergePdfsUseCase.execute(pdfIds, watermark, pageNumbering);
       res.json(result);
     } catch (err) {
       next(err);

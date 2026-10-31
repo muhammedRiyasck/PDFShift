@@ -1,6 +1,10 @@
 import { IPdfRepository } from '../../domain/repositories/IPdfRepository';
 import { IStorageService } from '../../domain/services/IStorageService';
-import { PdfLibService, WatermarkOptions } from '../../infrastructure/pdf/PdfLibService';
+import {
+  PdfLibService,
+  WatermarkOptions,
+  PageNumberingOptions,
+} from '../../infrastructure/pdf/PdfLibService';
 import { v4 as uuidv4 } from 'uuid';
 
 export interface MergeResult {
@@ -17,7 +21,11 @@ export class MergePdfsUseCase {
     private readonly pdfLibService: PdfLibService
   ) {}
 
-  async execute(pdfIds: string[], watermark?: WatermarkOptions): Promise<MergeResult> {
+  async execute(
+    pdfIds: string[],
+    watermark?: WatermarkOptions,
+    pageNumbering?: PageNumberingOptions
+  ): Promise<MergeResult> {
     if (!Array.isArray(pdfIds) || pdfIds.length < 2) {
       throw new Error('At least two PDF documents are required for merging');
     }
@@ -42,7 +50,7 @@ export class MergePdfsUseCase {
     }
 
     // 3. Merge buffers using pdf-lib
-    const mergedBytes = await this.pdfLibService.mergePdfs(buffers, watermark);
+    const mergedBytes = await this.pdfLibService.mergePdfs(buffers, watermark, pageNumbering);
 
     // 4. Upload merged output to S3
     const outputFilename = `merged-${uuidv4()}.pdf`;
