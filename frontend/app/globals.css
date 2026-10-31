@@ -11,6 +11,17 @@ body {
   min-height: 100vh;
 }
 
+@layer base {
+  /* Ensure interactive elements always show pointer cursor */
+  button,
+  [role="button"],
+  a,
+  label[for],
+  select {
+    cursor: pointer;
+  }
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 8px;

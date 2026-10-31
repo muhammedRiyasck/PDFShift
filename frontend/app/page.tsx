@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import axios from "axios";
 import toast from "react-hot-toast";
 import { API_BASE } from "@/lib/config";
+import PDFIcon from "@/components/PDFIcon";
 
 export default function HomePage() {
   const router = useRouter();
@@ -77,41 +78,41 @@ export default function HomePage() {
   };
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-slate-950 via-[#0d1117] to-slate-950 flex flex-col items-center justify-center px-4 py-16 selection:bg-indigo-500 selection:text-white">
+    <main className="min-h-screen bg-gradient-to-b from-slate-950 via-[#0d1117] to-slate-950 flex flex-col items-center justify-center px-4 py-10 sm:py-16 selection:bg-indigo-500 selection:text-white relative overflow-x-hidden">
       {/* Background ambient decorative glow */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[350px] bg-indigo-600/15 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90vw] max-w-[500px] h-[250px] sm:h-[350px] bg-indigo-600/15 rounded-full blur-[90px] sm:blur-[120px] pointer-events-none" />
 
       {/* Hero Header */}
-      <div className="relative text-center max-w-2xl mx-auto mb-10">
+      <div className="relative text-center max-w-2xl mx-auto mb-8 sm:mb-10 px-2">
         {/* Brand Logo & Pill */}
-        <div className="flex items-center justify-center gap-3 mb-6">
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-500 flex items-center justify-center text-white text-base font-black shadow-lg shadow-indigo-500/25">
+        <div className="flex items-center justify-center gap-2.5 sm:gap-3 mb-5 sm:mb-6">
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-500 flex items-center justify-center text-white text-base font-black shadow-lg shadow-indigo-500/25 shrink-0">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
             </svg>
           </div>
-          <span className="text-2xl font-black tracking-tight text-white">
+          <span className="text-xl sm:text-2xl font-black tracking-tight text-white">
             PDF<span className="text-indigo-400">Shift</span>
           </span>
-          <span className="ml-1 text-[11px] font-semibold tracking-wider uppercase px-2 py-0.5 rounded-md bg-indigo-500/10 border border-indigo-500/20 text-indigo-300">
+          <span className="ml-1 text-[10px] sm:text-[11px] font-semibold tracking-wider uppercase px-2 py-0.5 rounded-md bg-indigo-500/10 border border-indigo-500/20 text-indigo-300">
             v1.0
           </span>
         </div>
 
-        <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-white mb-4">
+        <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight text-white mb-3 sm:mb-4 leading-tight">
           Shift, Reorder & Extract <br className="hidden sm:inline" />
           <span className="bg-gradient-to-r from-indigo-400 via-purple-300 to-indigo-200 bg-clip-text text-transparent">
             Pages from any PDF
           </span>
         </h1>
 
-        <p className="text-slate-400 text-base sm:text-lg leading-relaxed">
+        <p className="text-slate-400 text-sm sm:text-base md:text-lg leading-relaxed max-w-xl mx-auto">
           Upload your document, visually select the pages you need, drag to shift the sequence, and generate a new PDF in seconds.
         </p>
       </div>
 
       {/* Upload Zone Card */}
-      <div className="relative w-full max-w-xl">
+      <div className="relative w-full max-w-xl px-0 sm:px-2">
         <div
           onDragOver={(e) => {
             e.preventDefault();
@@ -120,11 +121,10 @@ export default function HomePage() {
           onDragLeave={() => setIsDragging(false)}
           onDrop={handleDrop}
           onClick={() => document.getElementById("file-input")?.click()}
-          className={`relative group border-2 border-dashed rounded-3xl p-8 sm:p-12 text-center cursor-pointer transition-all duration-300 backdrop-blur-xl
-            ${
-              isDragging
-                ? "border-indigo-400 bg-indigo-500/15 shadow-2xl shadow-indigo-500/20 scale-[1.01]"
-                : selectedFile
+          className={`relative group border-2 border-dashed rounded-2xl sm:rounded-3xl p-6 sm:p-10 md:p-12 text-center cursor-pointer transition-all duration-300 backdrop-blur-xl
+            ${isDragging
+              ? "border-indigo-400 bg-indigo-500/15 shadow-2xl shadow-indigo-500/20 scale-[1.01]"
+              : selectedFile
                 ? "border-emerald-500/40 bg-emerald-950/20 shadow-xl shadow-emerald-900/10"
                 : "border-slate-800 bg-slate-900/40 hover:border-indigo-500/40 hover:bg-slate-900/60 shadow-xl"
             }`}
@@ -138,45 +138,60 @@ export default function HomePage() {
           />
 
           {selectedFile ? (
-            <div className="space-y-4">
-              <div className="w-16 h-16 rounded-2xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center mx-auto text-emerald-400">
-                <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+            <div className="space-y-3.5 sm:space-y-4">
+              {/* PDF icon with remove button */}
+              <div className="relative flex justify-center">
+                <PDFIcon size={56} />
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedFile(null);
+                    // reset the file input so the same file can be re-selected
+                    const input = document.getElementById("file-input") as HTMLInputElement;
+                    if (input) input.value = "";
+                  }}
+                  aria-label="Remove selected file"
+                  className="absolute -top-8 -right-5 w-6 h-6 rounded hover:bg-rose-400 active:scale-90 text-white flex items-center justify-center shadow-lg transition-all"
+                >
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
               </div>
 
               <div>
-                <p className="text-white font-semibold text-lg truncate max-w-md mx-auto">
+                <p className="text-white font-semibold text-base sm:text-lg truncate max-w-[240px] xs:max-w-xs sm:max-w-md mx-auto" title={selectedFile.name}>
                   {selectedFile.name}
                 </p>
-                <p className="text-slate-400 text-sm mt-1">
+                <p className="text-slate-400 text-xs sm:text-sm mt-1">
                   {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB · Ready to process
                 </p>
               </div>
 
-              <span className="inline-block text-xs font-medium text-slate-500 group-hover:text-slate-400 transition-colors">
+              <span className="inline-block text-[11px] sm:text-xs md:text-lg font-medium text-slate-500 group-hover:text-slate-400 transition-colors">
                 Click or drop another file to change
               </span>
             </div>
           ) : (
-            <div className="space-y-4">
-              <div className="w-16 h-16 rounded-2xl bg-indigo-600/10 border border-indigo-500/20 flex items-center justify-center mx-auto text-indigo-400 group-hover:scale-110 transition-transform duration-300">
-                <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="space-y-3.5 sm:space-y-4">
+              <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-indigo-600/10 border border-indigo-500/20 flex items-center justify-center mx-auto text-indigo-400 group-hover:scale-110 transition-transform duration-300">
+                <svg className="w-7 h-7 sm:w-8 sm:h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                 </svg>
               </div>
 
               <div>
-                <p className="text-white font-semibold text-lg">
+                <p className="text-white font-semibold text-base sm:text-lg">
                   {isDragging ? "Drop your PDF right here" : "Choose a PDF or drag & drop"}
                 </p>
-                <p className="text-slate-400 text-sm mt-1">
+                <p className="text-slate-400 text-xs sm:text-sm mt-1">
                   Supports standard PDF documents up to 50MB
                 </p>
               </div>
 
-              <div className="pt-2">
-                <span className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-800/80 border border-slate-700/80 text-xs font-medium text-slate-200 group-hover:bg-indigo-600 group-hover:border-indigo-500 group-hover:text-white transition-all shadow-sm">
+              <div className="pt-1 sm:pt-2">
+                <span className="inline-flex items-center gap-1.5 px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl bg-slate-800/80 border border-slate-700/80 text-xs sm:text-sm font-medium text-slate-200 group-hover:bg-indigo-600 group-hover:border-indigo-500 group-hover:text-white transition-all shadow-sm">
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                   </svg>
@@ -192,8 +207,25 @@ export default function HomePage() {
           <button
             onClick={handleUpload}
             disabled={isUploading}
-            className="mt-4 w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold shadow-lg shadow-indigo-600/30 hover:shadow-indigo-500/40 transition-all duration-200 flex items-center justify-center gap-2.5"
-          >
+            className="mt-4 w-full py-3.5 px-6 rounded-2xl
+                        bg-white/10 backdrop-blur-xl
+                        border border-white/20
+                        text-white text-sm sm:text-base font-semibold
+                        shadow-[0_8px_32px_rgba(99,102,241,0.15)]
+                        hover:bg-white/20
+                        hover:border-indigo-300/50
+                        hover:shadow-[0_8px_35px_rgba(99,102,241,0.4)]
+                        hover:-translate-y-0.5
+                        active:translate-y-0
+                        disabled:opacity-50 disabled:cursor-not-allowed
+                        transition-all duration-300 ease-out
+                        relative overflow-hidden
+                        before:absolute before:inset-0
+                        before:bg-gradient-to-r before:from-transparent before:via-white/25 before:to-transparent
+                        before:-translate-x-full
+                        hover:before:translate-x-full
+                        before:transition-transform before:duration-700
+                        flex items-center justify-center gap-2.5 cursor-pointer"          >
             {isUploading ? (
               <>
                 <svg className="animate-spin w-5 h-5 text-white" fill="none" viewBox="0 0 24 24">
@@ -214,18 +246,18 @@ export default function HomePage() {
         )}
 
         {/* Security & Privacy Trust Badge */}
-        <div className="flex items-center justify-center gap-2 mt-4 text-xs text-slate-400 font-medium">
+        <div className="flex items-center justify-center gap-2 mt-4 text-[11px] sm:text-xs text-slate-400 font-medium text-center px-2">
           <svg className="w-3.5 h-3.5 text-emerald-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
           </svg>
-          <span>End-to-End Encrypted Transfer · Your documents remain strictly private</span>
+          <span>End-to-End Encrypted Transfer.</span>
         </div>
       </div>
 
       {/* Feature cards */}
-      <div className="mt-16 grid grid-cols-1 sm:grid-cols-3 gap-4 w-full max-w-3xl">
-        <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-5 backdrop-blur-sm">
-          <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 mb-3">
+      <div className="mt-12 sm:mt-16 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4 w-full max-w-3xl">
+        <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-4 sm:p-5 backdrop-blur-sm">
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 mb-3">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
@@ -237,8 +269,8 @@ export default function HomePage() {
           </p>
         </div>
 
-        <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-5 backdrop-blur-sm">
-          <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 mb-3">
+        <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-4 sm:p-5 backdrop-blur-sm">
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 mb-3">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
             </svg>
@@ -249,8 +281,8 @@ export default function HomePage() {
           </p>
         </div>
 
-        <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-5 backdrop-blur-sm">
-          <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 mb-3">
+        <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-4 sm:p-5 backdrop-blur-sm sm:col-span-2 lg:col-span-1">
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 mb-3">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
             </svg>

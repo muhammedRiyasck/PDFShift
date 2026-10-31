@@ -23,11 +23,21 @@ import {
   horizontalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import PDFIcon from "@/components/PDFIcon";
 
-// Dynamically import react-pdf to avoid SSR issues
 const PDFPageThumbnail = dynamic(() => import("@/components/PDFPageThumbnail"), {
   ssr: false,
-  loading: () => <div className="w-full aspect-[3/4] bg-slate-800 rounded-lg animate-pulse" />,
+  loading: () => (
+    <div className="w-full aspect-[3/4] bg-slate-900 flex flex-col gap-2 p-3">
+      <div className="w-3/4 h-2.5 rounded bg-slate-700 animate-pulse" />
+      <div className="w-1/2 h-2 rounded bg-slate-800 animate-pulse" />
+      <div className="w-full h-px bg-slate-700/50 mt-1" />
+      {[100, 88, 94, 78].map((w, i) => (
+        <div key={i} className="h-1.5 rounded bg-slate-700/70 animate-pulse" style={{ width: `${w}%` }} />
+      ))}
+      <div className="flex-1 rounded bg-slate-800 animate-pulse" />
+    </div>
+  ),
 });
 
 interface PdfInfo {
@@ -49,28 +59,30 @@ function SortablePageItem({ page, index, onRemove }: SortablePageItemProps) {
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.5 : 1,
+    opacity: isDragging ? 0.4 : 1,
+    zIndex: isDragging ? 50 : undefined,
   };
 
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className="flex-shrink-0 relative group"
-    >
+    <div ref={setNodeRef} style={style} className="flex-shrink-0 relative group touch-manipulation overflow-visible">
       <div
         {...attributes}
         {...listeners}
-        className="w-14 h-14 sm:w-16 sm:h-16 rounded-lg bg-indigo-600/20 border border-indigo-500/40 flex flex-col items-center justify-center cursor-grab active:cursor-grabbing hover:border-indigo-400 transition-colors"
+        className="w-14 h-14 rounded-xl bg-slate-800 border border-slate-700 hover:border-indigo-500/60 hover:bg-indigo-600/10 flex flex-col items-center justify-center cursor-grab active:cursor-grabbing transition-all select-none shadow-sm"
       >
-        <span className="text-xs text-slate-400 mb-0.5">#{index + 1}</span>
-        <span className="text-white font-bold text-sm">p{page}</span>
+        <span className="text-[9px] text-slate-500 font-semibold uppercase tracking-wide leading-none mb-1">#{index + 1}</span>
+        <span className="text-white font-bold text-sm leading-none">p{page}</span>
       </div>
+      {/* Remove badge */}
       <button
-        onClick={() => onRemove(page)}
-        className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-red-500 text-white text-xs items-center justify-center hidden group-hover:flex transition-all"
+        type="button"
+        onClick={(e) => { e.stopPropagation(); onRemove(page); }}
+        aria-label={`Remove page ${page}`}
+        className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-rose-500 hover:bg-rose-400 active:scale-90 text-white flex items-center justify-center shadow-md transition-all opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
       >
-        ×
+        <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+        </svg>
       </button>
     </div>
   );
@@ -90,7 +102,7 @@ export default function PdfViewerPage() {
   const [extractedCount, setExtractedCount] = useState<number>(0);
 
   const sensors = useSensors(
-    useSensor(PointerSensor),
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
@@ -112,9 +124,7 @@ export default function PdfViewerPage() {
 
   const togglePage = useCallback((pageNum: number) => {
     setSelectedPages((prev) =>
-      prev.includes(pageNum)
-        ? prev.filter((p) => p !== pageNum)
-        : [...prev, pageNum]
+      prev.includes(pageNum) ? prev.filter((p) => p !== pageNum) : [...prev, pageNum]
     );
   }, []);
 
@@ -148,17 +158,15 @@ export default function PdfViewerPage() {
     setIsExtracting(true);
     setDownloadUrl(null);
     try {
-      const res = await axios.post(`${API_BASE}/api/pdf/${id}/extract`, {
-        pages: selectedPages,
-      });
-      const url = res.data.downloadUrl.startsWith("http") ? res.data.downloadUrl : `${API_BASE}${res.data.downloadUrl}`;
+      const res = await axios.post(`${API_BASE}/api/pdf/${id}/extract`, { pages: selectedPages });
+      const url = res.data.downloadUrl.startsWith("http")
+        ? res.data.downloadUrl
+        : `${API_BASE}${res.data.downloadUrl}`;
       setDownloadUrl(url);
       setExtractedCount(selectedPages.length);
-
-      // Auto download
       const a = document.createElement("a");
       a.href = url;
-      a.download = `extracted-pages.pdf`;
+      a.download = "extracted-pages.pdf";
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -173,15 +181,21 @@ export default function PdfViewerPage() {
     }
   };
 
+  /* ─── Loading state ─────────────────────────────────────────────── */
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center p-4">
         <div className="text-center space-y-4">
-          <svg className="animate-spin w-10 h-10 text-indigo-400 mx-auto" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-          </svg>
-          <p className="text-slate-400">Loading PDF...</p>
+          <div className="w-14 h-14 rounded-2xl bg-indigo-600/10 border border-indigo-500/20 flex items-center justify-center mx-auto">
+            <svg className="animate-spin w-7 h-7 text-indigo-400" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+          </div>
+          <div>
+            <p className="text-white font-semibold text-sm">Loading your PDF</p>
+            <p className="text-slate-500 text-xs mt-0.5">This may take a moment…</p>
+          </div>
         </div>
       </div>
     );
@@ -189,77 +203,152 @@ export default function PdfViewerPage() {
 
   if (!pdfInfo) return null;
 
+  const hasSelection = selectedPages.length > 0;
+
   return (
-    <div className="min-h-screen flex flex-col">
-      {/* Header */}
-      <header className="sticky top-0 z-40 bg-slate-950/80 backdrop-blur border-b border-slate-800">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-4">
+    <div className="min-h-screen flex flex-col bg-[#090d16]">
+
+      {/* ── Header ──────────────────────────────────────────────────── */}
+      <header className="sticky top-0 z-40 bg-slate-950/95 backdrop-blur-md border-b border-slate-800/80">
+
+        {/* Main nav row */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-[60px] flex items-center gap-3 sm:gap-4">
+
+          {/* Back + Brand */}
           <button
             onClick={() => router.push("/")}
-            className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors group"
             title="Back to home"
+            className="flex items-center gap-3 shrink-0 group"
           >
-            <div className="w-8 h-8 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center group-hover:border-slate-700 transition-colors">
+            {/* Back icon */}
+            <div className="w-9 h-9 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400 group-hover:text-white group-hover:border-indigo-500/50 group-hover:bg-slate-800/80 transition-all">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
               </svg>
             </div>
-            <div className="hidden md:flex items-center gap-1.5 mr-2">
-              <span className="w-6 h-6 rounded-lg bg-gradient-to-tr from-indigo-600 to-purple-500 flex items-center justify-center text-white text-[11px] font-black">
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+
+            {/* Brand — desktop */}
+            <div className="hidden sm:flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-500 flex items-center justify-center shadow-lg shadow-indigo-600/30">
+                <svg className="w-[18px] h-[18px] text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
                 </svg>
+              </div>
+              <span className="font-black md:text-2xl text-white tracking-tight leading-none">
+                PDF<span className="text-indigo-400">Shift</span>
               </span>
-              <span className="font-bold text-white text-sm">PDF<span className="text-indigo-400">Shift</span></span>
             </div>
           </button>
-          <div className="flex-1 min-w-0">
-            <h1 className="text-white font-semibold truncate text-sm sm:text-base">{pdfInfo.originalName}</h1>
-            <p className="text-slate-500 text-xs">{pdfInfo.pageCount} pages total</p>
+
+          {/* Divider */}
+          <div className="hidden sm:block w-px h-7 bg-slate-800/80 shrink-0" />
+
+          {/* File info */}
+          <div className="flex-1 min-w-0 flex items-center gap-2.5">
+            {/* PDF icon chip */}
+            <div className="hidden xs:flex shrink-0">
+              <PDFIcon size={34} />
+            </div>
+            <div className="min-w-0">
+              <h1
+                className="text-white font-semibold truncate text-sm sm:text-[15px] leading-tight"
+                title={pdfInfo.originalName}
+              >
+                {pdfInfo.originalName}
+              </h1>
+              <p className="text-slate-500 text-[11px] sm:text-xs mt-0.5 flex items-center gap-1.5">
+                <span>{pdfInfo.pageCount} {pdfInfo.pageCount === 1 ? "page" : "pages"}</span>
+                {hasSelection && (
+                  <>
+                    <span className="text-slate-700">·</span>
+                    <span className="text-indigo-400 font-medium">{selectedPages.length} selected</span>
+                  </>
+                )}
+              </p>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button onClick={selectAll} className="text-xs px-3 py-1.5 rounded-lg border border-slate-700 text-slate-300 hover:border-slate-500 transition-colors hidden sm:block">
+
+          {/* Action buttons */}
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Select All — desktop */}
+            <button
+              onClick={selectAll}
+              disabled={selectedPages.length === pdfInfo.pageCount}
+              className="hidden sm:inline-flex items-center gap-1.5 text-sm px-3.5 py-2 rounded-xl border border-slate-700/80 bg-slate-900/50 text-slate-300 hover:bg-slate-800 hover:border-slate-600 hover:text-white transition-all font-medium disabled:opacity-40 active:scale-[0.98] font-medium transition-all disabled:cursor-not-allowed"
+            >
+              <svg className="w-3.5 h-3.5 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+              </svg>
               Select All
             </button>
-            <button onClick={clearAll} className="text-xs px-3 py-1.5 rounded-lg border border-slate-700 text-slate-300 hover:border-slate-500 transition-colors hidden sm:block">
-              Clear
-            </button>
+
+            {/* Clear — desktop, only when something is selected */}
+            {hasSelection && (
+              <button
+                onClick={clearAll}
+                className="hidden sm:inline-flex items-center gap-1.5 text-sm px-3.5 py-2 rounded-xl border border-slate-700/80 bg-slate-900/50 text-slate-400 hover:bg-slate-800 hover:border-rose-500/40 hover:text-rose-400 transition-all font-medium"
+              >
+                <svg className="w-3.5 h-3.5 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                Clear
+              </button>
+            )}
+
+            {/* Extract button */}
             <button
               onClick={handleExtract}
-              disabled={isExtracting || selectedPages.length === 0}
-              className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-900 disabled:cursor-not-allowed text-white text-sm font-semibold transition-all flex items-center gap-2"
+              disabled={isExtracting || !hasSelection}
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all
+                ${hasSelection && !isExtracting
+                  ? "bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white shadow-lg shadow-indigo-600/25 hover:shadow-indigo-500/35"
+                  : "bg-slate-800/80 border border-slate-700/80 text-slate-500 cursor-not-allowed"
+                }`}
             >
               {isExtracting ? (
                 <>
-                  <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                  <svg className="animate-spin w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                   </svg>
-                  Extracting...
+                  <span>Extracting…</span>
                 </>
               ) : (
                 <>
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                   </svg>
-                  Extract {selectedPages.length > 0 ? `(${selectedPages.length})` : ""}
+                  <span>
+                    Extract
+                    {hasSelection && (
+                      <span className="ml-1.5 bg-white/20 rounded px-1.5 py-0.5 text-xs font-bold tabular-nums">
+                        {selectedPages.length}
+                      </span>
+                    )}
+                  </span>
                 </>
               )}
             </button>
           </div>
         </div>
 
-        {/* Selected pages reorder strip */}
-        {selectedPages.length > 0 && (
-          <div className="border-t border-slate-800 bg-slate-900/60 px-4 py-2">
+        {/* ── Reorder strip (when pages are selected) ────────────── */}
+        {  (
+          <div className="border-t  border-slate-800/60 bg-slate-900/60 px-4 sm:px-6 py-3 my-2">
             <div className="max-w-7xl mx-auto">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-xs text-slate-400 font-medium">Selected order (drag to reorder):</span>
-                <span className="text-xs text-indigo-400">{selectedPages.length} page{selectedPages.length !== 1 ? "s" : ""}</span>
+              <div className="flex items-center justify-between my-2.5">
+                <div className="flex items-center gap-2">
+                  <svg className="w-3.5 h-3.5 text-indigo-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                  </svg>
+                  <span className="text-sm font-semibold text-slate-300">Page order</span>
+                  <span className="text-xs text-slate-500">— drag to rearrange</span>
+                </div>
+               
               </div>
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                 <SortableContext items={selectedPages} strategy={horizontalListSortingStrategy}>
-                  <div className="flex gap-2 overflow-x-auto pb-1">
+                  <div className="flex gap-2 pb-1 pt-2 px-1">
                     {selectedPages.map((page, index) => (
                       <SortablePageItem key={page} page={page} index={index} onRemove={removePage} />
                     ))}
@@ -269,32 +358,50 @@ export default function PdfViewerPage() {
             </div>
           </div>
         )}
+
+        {/* ── Mobile quick-action bar ───────────────────────────── */}
+        <div className="sm:hidden flex gap-2 px-4 py-2.5 border-t border-slate-800/60 bg-slate-950/60">
+          <button
+            onClick={selectAll}
+            disabled={selectedPages.length === pdfInfo.pageCount}
+            className="flex-1 text-xs py-2.5 rounded-xl border border-slate-800 bg-slate-900 text-slate-300 hover:bg-slate-800 hover:border-slate-700 active:scale-[0.98] font-medium disabled:opacity-40 active:scale-[0.98] font-medium transition-all cursor-not-allowed"
+          >
+            Select All ({pdfInfo.pageCount})
+          </button>
+          <button
+            onClick={clearAll}
+            disabled={!selectedPages.length}
+            className="flex-1 text-xs py-2.5 rounded-xl border border-slate-800 bg-slate-900 text-slate-400 hover:bg-slate-800 hover:text-rose-400 hover:border-rose-500/30 disabled:opacity-40 active:scale-[0.98] font-medium transition-all cursor-not-allowed"
+          >
+            Clear ({selectedPages.length})
+          </button>
+        </div>
       </header>
 
-      {/* Extraction Success Banner */}
+      {/* ── Success Banner ──────────────────────────────────────────── */}
       {downloadUrl && (
-        <div className="bg-emerald-950/70 border-b border-emerald-500/30 px-4 py-3">
-          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
-            <div className="flex items-center gap-3 text-center sm:text-left">
-              <div className="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+        <div className="bg-gradient-to-r from-emerald-950/80 via-emerald-950/60 to-emerald-950/80 border-b border-emerald-500/25 px-4 sm:px-6 py-3.5">
+          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/25 text-emerald-400 flex items-center justify-center shrink-0">
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
               </div>
               <div>
-                <p className="text-emerald-300 font-medium text-sm">
-                  New PDF ready! ({extractedCount} page{extractedCount !== 1 ? "s" : ""} extracted in custom order)
+                <p className="text-emerald-300 font-semibold text-sm">
+                  {extractedCount} {extractedCount !== 1 ? "pages" : "page"} extracted successfully!
                 </p>
-                <p className="text-slate-400 text-xs">
-                  Download started automatically. Click the button to download again anytime.
+                <p className="text-slate-400 text-xs mt-0.5">
+                  Download started automatically — use the button below to re-download.
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
               <a
                 href={downloadUrl}
                 download="extracted-pages.pdf"
-                className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-sm"
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition-colors shadow-md shadow-emerald-600/20"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -303,24 +410,43 @@ export default function PdfViewerPage() {
               </a>
               <button
                 onClick={() => setDownloadUrl(null)}
-                className="text-slate-400 hover:text-slate-200 text-xs px-2 py-1 rounded"
+                className="p-2 rounded-xl text-slate-500 hover:text-slate-300 hover:bg-slate-800/60 transition-all"
+                aria-label="Dismiss"
               >
-                Dismiss
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Mobile action buttons */}
-      <div className="sm:hidden flex gap-2 px-4 py-2 bg-slate-900/50 border-b border-slate-800">
-        <button onClick={selectAll} className="flex-1 text-xs py-2 rounded-lg border border-slate-700 text-slate-300">Select All</button>
-        <button onClick={clearAll} className="flex-1 text-xs py-2 rounded-lg border border-slate-700 text-slate-300">Clear All</button>
-      </div>
+      {/* ── Page Grid ───────────────────────────────────────────────── */}
+      <main className="flex-1 max-w-7xl mx-auto w-full px-3 sm:px-6 py-5 sm:py-8">
 
-      {/* Page Grid */}
-      <main className="flex-1 max-w-7xl mx-auto w-full px-4 py-6">
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+        {/* Grid header */}
+        <div className="flex items-center justify-between mb-4 sm:mb-6">
+          <div>
+            <h2 className="text-white font-semibold text-sm sm:text-base">All Pages</h2>
+            <p className="text-slate-500 text-xs sm:text-sm mt-0.5">
+              {hasSelection
+                ? `${selectedPages.length} of ${pdfInfo.pageCount} pages selected`
+                : "Tap a page to select it"}
+            </p>
+          </div>
+          {hasSelection && (
+            <button
+              onClick={clearAll}
+              className="hidden sm:inline-flex text-xs text-slate-500 hover:text-rose-400 border border-slate-800 hover:border-rose-500/30 px-3 py-1.5 rounded-lg transition-all font-medium"
+            >
+              Deselect all
+            </button>
+          )}
+        </div>
+
+        {/* Thumbnail grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
           {Array.from({ length: pdfInfo.pageCount }, (_, i) => i + 1).map((pageNum) => {
             const isSelected = selectedPages.includes(pageNum);
             const selectionIndex = selectedPages.indexOf(pageNum);
@@ -328,34 +454,48 @@ export default function PdfViewerPage() {
               <div
                 key={pageNum}
                 onClick={() => togglePage(pageNum)}
-                className={`relative cursor-pointer rounded-xl overflow-hidden border-2 transition-all duration-150 group
+                className={`relative cursor-pointer rounded-xl overflow-hidden border-2 transition-all duration-150 select-none group
                   ${isSelected
-                    ? "border-indigo-500 shadow-lg shadow-indigo-500/20 scale-[1.02]"
-                    : "border-slate-800 hover:border-slate-600"
+                    ? "border-indigo-500 shadow-lg shadow-indigo-500/25 scale-[1.02]"
+                    : "border-slate-800 hover:border-slate-600 hover:shadow-md hover:shadow-black/30"
                   }`}
               >
-                {/* Selection badge */}
+                {/* Selection number badge */}
                 {isSelected && (
-                  <div className="absolute top-2 right-2 z-10 w-6 h-6 rounded-full bg-indigo-600 flex items-center justify-center shadow-lg">
-                    <span className="text-white text-xs font-bold">{selectionIndex + 1}</span>
+                  <div className="absolute top-2 right-2 z-10 w-6 h-6 rounded-full bg-indigo-600 border-2 border-indigo-400/40 flex items-center justify-center shadow-lg">
+                    <span className="text-white text-[10px] font-bold tabular-nums">{selectionIndex + 1}</span>
                   </div>
                 )}
-                {/* Checkbox overlay */}
-                <div className={`absolute top-2 left-2 z-10 w-5 h-5 rounded border-2 flex items-center justify-center transition-all
-                  ${isSelected ? "bg-indigo-600 border-indigo-600" : "border-slate-600 bg-slate-900/50 group-hover:border-slate-400"}`}>
+
+                {/* Checkbox */}
+                <div className={`absolute top-2 left-2 z-10 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all
+                  ${isSelected
+                    ? "bg-indigo-600 border-indigo-500 shadow-md"
+                    : "border-slate-600/70 bg-slate-950/50 group-hover:border-slate-400"}`}
+                >
                   {isSelected && (
                     <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                     </svg>
                   )}
                 </div>
-                {/* PDF page thumbnail */}
-                <div className="bg-white">
+
+                {/* Hover overlay for unselected */}
+                {!isSelected && (
+                  <div className="absolute inset-0 z-[5] bg-indigo-600/0 group-hover:bg-indigo-600/5 transition-colors" />
+                )}
+
+                {/* PDF thumbnail */}
+                <div className="bg-slate-900">
                   <PDFPageThumbnail pdfUrl={pdfUrl} pageNumber={pageNum} />
                 </div>
-                {/* Page number label */}
-                <div className={`py-1.5 text-center text-xs font-medium transition-colors
-                  ${isSelected ? "bg-indigo-900/80 text-indigo-200" : "bg-slate-900 text-slate-400"}`}>
+
+                {/* Page label */}
+                <div className={`py-1.5 text-center text-xs font-medium tracking-wide transition-colors
+                  ${isSelected
+                    ? "bg-indigo-600/90 text-white"
+                    : "bg-slate-900 text-slate-500 group-hover:text-slate-300"}`}
+                >
                   Page {pageNum}
                 </div>
               </div>
