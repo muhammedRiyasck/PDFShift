@@ -65,4 +65,47 @@ export class PdfLibService {
 
     return await newPdf.save();
   }
+
+  async mergePdfs(
+    sourceBuffers: Buffer[],
+    watermark?: WatermarkOptions
+  ): Promise<Uint8Array> {
+    const mergedPdf = await PDFDocument.create();
+
+    for (const buffer of sourceBuffers) {
+      const srcDoc = await PDFDocument.load(buffer);
+      const pageIndices = srcDoc.getPageIndices();
+      const copiedPages = await mergedPdf.copyPages(srcDoc, pageIndices);
+      copiedPages.forEach((p) => mergedPdf.addPage(p));
+    }
+
+    if (watermark && watermark.text && watermark.text.trim().length > 0) {
+      const font = await mergedPdf.embedFont(StandardFonts.HelveticaBold);
+      const text = watermark.text.trim();
+      const opacity = typeof watermark.opacity === 'number' ? watermark.opacity : 0.25;
+      const color = watermark.color
+        ? rgb(watermark.color.r, watermark.color.g, watermark.color.b)
+        : rgb(0.8, 0.2, 0.2);
+
+      const createdPages = mergedPdf.getPages();
+      for (const page of createdPages) {
+        const { width, height } = page.getSize();
+        const textSize = Math.max(16, Math.min(width, height) / 10);
+        const textWidth = font.widthOfTextAtSize(text, textSize);
+        const textHeight = font.heightAtSize(textSize);
+
+        page.drawText(text, {
+          x: (width - textWidth) / 2,
+          y: (height - textHeight) / 2,
+          size: textSize,
+          font,
+          color,
+          opacity,
+          rotate: degrees(35),
+        });
+      }
+    }
+
+    return await mergedPdf.save();
+  }
 }

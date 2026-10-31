@@ -12,6 +12,7 @@ export function createPdfRouter(controller: PdfController): Router {
   router.get('/pdf/:id/info', controller.getPdfInfo);
   router.get('/pdf/:id/file', controller.getPdfFile);
   router.post('/pdf/:id/extract', controller.extractPages);
+  router.post('/pdf/merge', controller.mergePdfs);
   router.get('/pdf/download/:filename', controller.downloadPdf);
 
   return router;

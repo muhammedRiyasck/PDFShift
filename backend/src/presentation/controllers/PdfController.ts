@@ -3,6 +3,7 @@ import { CreatePresignedUploadUseCase } from '../../application/use-cases/Create
 import { ConfirmUploadUseCase } from '../../application/use-cases/ConfirmUploadUseCase';
 import { GetPdfInfoUseCase } from '../../application/use-cases/GetPdfInfoUseCase';
 import { ExtractPagesUseCase } from '../../application/use-cases/ExtractPagesUseCase';
+import { MergePdfsUseCase } from '../../application/use-cases/MergePdfsUseCase';
 import { IStorageService } from '../../domain/services/IStorageService';
 
 export class PdfController {
@@ -11,6 +12,7 @@ export class PdfController {
     private readonly confirmUploadUseCase: ConfirmUploadUseCase,
     private readonly getPdfInfoUseCase: GetPdfInfoUseCase,
     private readonly extractPagesUseCase: ExtractPagesUseCase,
+    private readonly mergePdfsUseCase: MergePdfsUseCase,
     private readonly storageService: IStorageService
   ) {}
 
@@ -103,6 +105,25 @@ export class PdfController {
         downloadUrl: result.downloadUrl,
         filename: result.filename,
       });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  mergePdfs = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { pdfIds, watermark } = req.body as {
+        pdfIds: string[];
+        watermark?: { text: string; opacity?: number; color?: { r: number; g: number; b: number } };
+      };
+
+      if (!Array.isArray(pdfIds) || pdfIds.length < 2) {
+        res.status(400).json({ error: 'At least two PDF files are required for merging' });
+        return;
+      }
+
+      const result = await this.mergePdfsUseCase.execute(pdfIds, watermark);
+      res.json(result);
     } catch (err) {
       next(err);
     }

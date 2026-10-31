@@ -5,6 +5,7 @@ import { CreatePresignedUploadUseCase } from './application/use-cases/CreatePres
 import { ConfirmUploadUseCase } from './application/use-cases/ConfirmUploadUseCase';
 import { GetPdfInfoUseCase } from './application/use-cases/GetPdfInfoUseCase';
 import { ExtractPagesUseCase } from './application/use-cases/ExtractPagesUseCase';
+import { MergePdfsUseCase } from './application/use-cases/MergePdfsUseCase';
 import { PdfController } from './presentation/controllers/PdfController';
 
 // Infrastructure
@@ -17,6 +18,7 @@ const createPresignedUploadUseCase = new CreatePresignedUploadUseCase(storageSer
 const confirmUploadUseCase = new ConfirmUploadUseCase(pdfRepository, storageService, pdfLibService);
 const getPdfInfoUseCase = new GetPdfInfoUseCase(pdfRepository);
 const extractPagesUseCase = new ExtractPagesUseCase(pdfRepository, storageService, pdfLibService);
+const mergePdfsUseCase = new MergePdfsUseCase(pdfRepository, storageService, pdfLibService);
 
 // Presentation Controller
 export const pdfController = new PdfController(
@@ -24,5 +26,6 @@ export const pdfController = new PdfController(
   confirmUploadUseCase,
   getPdfInfoUseCase,
   extractPagesUseCase,
+  mergePdfsUseCase,
   storageService
 );
