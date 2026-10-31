@@ -6,6 +6,19 @@ export interface WatermarkOptions {
   color?: { r: number; g: number; b: number };
 }
 
+export interface PDFAnnotation {
+  pageNum: number;
+  type: 'text' | 'redact';
+  xRatio: number; // 0 to 1
+  yRatio: number; // 0 to 1
+  widthRatio?: number; // 0 to 1
+  heightRatio?: number; // 0 to 1
+  text?: string;
+  fontSize?: number;
+  color?: string; // 'black' | 'red' | 'blue' | 'white'
+  redactStyle?: 'black' | 'white';
+}
+
 export class PdfLibService {
   async getPageCount(fileBuffer: Buffer): Promise<number> {
     const pdfDoc = await PDFDocument.load(fileBuffer);
@@ -16,13 +29,63 @@ export class PdfLibService {
     sourceBuffer: Buffer,
     pages: number[], // 1-indexed
     pageRotations?: Record<number, number>,
-    watermark?: WatermarkOptions
+    watermark?: WatermarkOptions,
+    annotations?: PDFAnnotation[]
   ): Promise<Uint8Array> {
     const sourcePdf = await PDFDocument.load(sourceBuffer);
     const newPdf = await PDFDocument.create();
+    let helveticaFont: any = null;
 
     for (const pageNum of pages) {
       const [copiedPage] = await newPdf.copyPages(sourcePdf, [pageNum - 1]);
+
+      // Apply annotations for this page
+      if (annotations && annotations.length > 0) {
+        const pageAnns = annotations.filter((a) => a.pageNum === pageNum);
+        if (pageAnns.length > 0) {
+          if (!helveticaFont) {
+            helveticaFont = await newPdf.embedFont(StandardFonts.Helvetica);
+          }
+          const { width, height } = copiedPage.getSize();
+
+          for (const ann of pageAnns) {
+            if (ann.type === 'redact') {
+              const boxW = Math.max(10, (ann.widthRatio || 0.25) * width);
+              const boxH = Math.max(8, (ann.heightRatio || 0.04) * height);
+              const boxX = ann.xRatio * width;
+              const boxY = (1 - ann.yRatio) * height - boxH;
+
+              copiedPage.drawRectangle({
+                x: Math.max(0, boxX),
+                y: Math.max(0, boxY),
+                width: boxW,
+                height: boxH,
+                color: ann.redactStyle === 'white' ? rgb(1, 1, 1) : rgb(0.05, 0.05, 0.05),
+              });
+            } else if (ann.type === 'text' && ann.text && ann.text.trim().length > 0) {
+              const size = ann.fontSize || 14;
+              const textX = ann.xRatio * width;
+              const textY = (1 - ann.yRatio) * height - size;
+
+              const colorMap: Record<string, any> = {
+                black: rgb(0.1, 0.1, 0.1),
+                red: rgb(0.85, 0.15, 0.15),
+                blue: rgb(0.15, 0.35, 0.85),
+                white: rgb(1, 1, 1),
+              };
+              const textColor = colorMap[ann.color || 'black'] || rgb(0.1, 0.1, 0.1);
+
+              copiedPage.drawText(ann.text.trim(), {
+                x: Math.max(0, textX),
+                y: Math.max(0, textY),
+                size,
+                font: helveticaFont,
+                color: textColor,
+              });
+            }
+          }
+        }
+      }
 
       // Apply rotation if requested for this page
       if (pageRotations && pageRotations[pageNum]) {

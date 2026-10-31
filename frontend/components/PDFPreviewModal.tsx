@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
+import { PDFAnnotation } from "@/types/pdf";
 
 if (typeof window !== "undefined") {
   pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
@@ -21,6 +22,8 @@ interface PDFPreviewModalProps {
   initialMode?: "all" | "selected";
   pageRotations?: Record<number, number>;
   onRotatePage?: (page: number) => void;
+  annotations?: PDFAnnotation[];
+  onUpdateAnnotations?: (annotations: PDFAnnotation[]) => void;
 }
 
 export default function PDFPreviewModal({
@@ -35,13 +38,17 @@ export default function PDFPreviewModal({
   initialMode = "all",
   pageRotations,
   onRotatePage,
+  annotations = [],
+  onUpdateAnnotations,
 }: PDFPreviewModalProps) {
   const [zoom, setZoom] = useState<number>(1);
   const [localRotation, setLocalRotation] = useState<number>(0);
-  const currentRotation = pageRotations ? (pageRotations[currentPage] || 0) : localRotation;
+  const currentRotation = pageRotations ? pageRotations[currentPage] || 0 : localRotation;
   const [mode, setMode] = useState<"all" | "selected">(initialMode);
   const [pageWidth, setPageWidth] = useState<number>(600);
   const [pageLoading, setPageLoading] = useState<boolean>(true);
+  const [activeTool, setActiveTool] = useState<"navigate" | "text" | "redact_black" | "redact_white">("navigate");
+
   const containerRef = useRef<HTMLDivElement>(null);
   const pillsContainerRef = useRef<HTMLDivElement>(null);
 
@@ -60,7 +67,6 @@ export default function PDFPreviewModal({
         const containerRect = container.getBoundingClientRect();
         const btnRect = activeBtn.getBoundingClientRect();
 
-        // Calculate offset to smoothly center the active button in the scroll container
         const scrollOffset =
           btnRect.left -
           containerRect.left -
@@ -89,6 +95,7 @@ export default function PDFPreviewModal({
       setMode(initialMode);
       setZoom(1);
       setLocalRotation(0);
+      setActiveTool("navigate");
     }
   }, [isOpen, initialMode]);
 
@@ -106,9 +113,8 @@ export default function PDFPreviewModal({
     const updateWidth = () => {
       if (!containerRef.current) return;
       const availableWidth = containerRef.current.clientWidth - 48; // padding
-      const availableHeight = containerRef.current.clientHeight - 48;
+      const availableHeight = containerRef.current.clientHeight - 80;
 
-      // Assuming standard ~3:4 aspect ratio
       const widthBasedOnHeight = availableHeight * (3 / 4);
       const targetWidth = Math.min(availableWidth, widthBasedOnHeight, 900);
       setPageWidth(Math.max(Math.floor(targetWidth), 280));
@@ -120,9 +126,10 @@ export default function PDFPreviewModal({
   }, [isOpen]);
 
   // Determine navigation sequence based on mode
-  const currentSequence = mode === "selected" && selectedPages.length > 0
-    ? selectedPages
-    : Array.from({ length: totalPages }, (_, i) => i + 1);
+  const currentSequence =
+    mode === "selected" && selectedPages.length > 0
+      ? selectedPages
+      : Array.from({ length: totalPages }, (_, i) => i + 1);
 
   const currentIndex = currentSequence.indexOf(currentPage);
   const hasPrev = currentIndex > 0;
@@ -158,7 +165,6 @@ export default function PDFPreviewModal({
     if (!isOpen) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't capture when typing in an input/textarea
       if (["INPUT", "TEXTAREA"].includes((e.target as HTMLElement)?.tagName)) return;
 
       if (e.key === "Escape") {
@@ -192,6 +198,77 @@ export default function PDFPreviewModal({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, handlePrev, handleNext, onClose, onToggleSelect, currentPage]);
 
+  /* ── Annotation Handlers ────────────────────────────────────────── */
+  const currentPageAnnotations = annotations.filter((a) => a.pageNum === currentPage);
+
+  const removeAnnotation = (id: string) => {
+    onUpdateAnnotations?.(annotations.filter((a) => a.id !== id));
+  };
+
+  const updateAnnotationText = (id: string, text: string) => {
+    onUpdateAnnotations?.(
+      annotations.map((a) => (a.id === id ? { ...a, text } : a))
+    );
+  };
+
+  const cycleColor = (id: string) => {
+    const colors = ["black", "red", "blue", "white"];
+    onUpdateAnnotations?.(
+      annotations.map((a) => {
+        if (a.id !== id) return a;
+        const nextIndex = (colors.indexOf(a.color || "black") + 1) % colors.length;
+        return { ...a, color: colors[nextIndex] };
+      })
+    );
+  };
+
+  const handleCanvasClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (activeTool === "navigate") return;
+    if ((e.target as HTMLElement).closest("[data-annotation]")) return;
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const xRatio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const yRatio = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
+
+    if (activeTool === "text") {
+      const newAnn: PDFAnnotation = {
+        id: "ann-" + Date.now(),
+        pageNum: currentPage,
+        type: "text",
+        xRatio,
+        yRatio,
+        text: "New text note",
+        fontSize: 14,
+        color: "black",
+      };
+      onUpdateAnnotations?.([...annotations, newAnn]);
+    } else if (activeTool === "redact_black") {
+      const newAnn: PDFAnnotation = {
+        id: "ann-" + Date.now(),
+        pageNum: currentPage,
+        type: "redact",
+        xRatio: Math.max(0, xRatio - 0.1),
+        yRatio: Math.max(0, yRatio - 0.02),
+        widthRatio: 0.25,
+        heightRatio: 0.04,
+        redactStyle: "black",
+      };
+      onUpdateAnnotations?.([...annotations, newAnn]);
+    } else if (activeTool === "redact_white") {
+      const newAnn: PDFAnnotation = {
+        id: "ann-" + Date.now(),
+        pageNum: currentPage,
+        type: "redact",
+        xRatio: Math.max(0, xRatio - 0.1),
+        yRatio: Math.max(0, yRatio - 0.02),
+        widthRatio: 0.25,
+        heightRatio: 0.04,
+        redactStyle: "white",
+      };
+      onUpdateAnnotations?.([...annotations, newAnn]);
+    }
+  };
+
   if (!isOpen) return null;
 
   const isSelected = selectedPages.includes(currentPage);
@@ -206,19 +283,16 @@ export default function PDFPreviewModal({
     >
       {/* ── Top Header Toolbar ────────────────────────────────────────── */}
       <header className="h-16 px-4 sm:px-6 bg-slate-950/80 border-b border-slate-800/80 flex items-center justify-between gap-3 shrink-0">
-        
         {/* Left: Mode toggle & Page info */}
         <div className="flex items-center gap-3 min-w-0">
           <div className="flex items-center gap-2">
             <span className="text-white font-bold text-base sm:text-lg tracking-tight">
               Page {currentPage}
             </span>
-            <span className="text-slate-500 text-xs sm:text-sm">
-              of {totalPages}
-            </span>
+            <span className="text-slate-500 text-xs sm:text-sm">of {totalPages}</span>
           </div>
 
-          {/* Mode Switcher: All vs Selected */}
+          {/* Mode Switcher */}
           {selectedPages.length > 0 && (
             <div className="hidden sm:flex items-center bg-slate-900 border border-slate-800 rounded-lg p-0.5 ml-2">
               <button
@@ -296,7 +370,12 @@ export default function PDFPreviewModal({
             className="w-8 h-8 rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white flex items-center justify-center transition-all"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+              />
             </svg>
           </button>
         </div>
@@ -337,7 +416,7 @@ export default function PDFPreviewModal({
             type="button"
             onClick={onClose}
             aria-label="Close preview"
-            className="w-9 h-9 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-white hover:border-slate-700 flex items-center justify-center transition-all"
+            className="w-9 h-9 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-white hover:border-slate-700 flex items-center justify-center transition-all cursor-pointer"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -346,9 +425,78 @@ export default function PDFPreviewModal({
         </div>
       </header>
 
+      {/* ── Secondary Annotation Toolbar ──────────────────────────────── */}
+      <div className="h-11 px-4 sm:px-6 bg-slate-900/90 border-b border-slate-800/80 flex items-center justify-between gap-3 shrink-0 text-xs">
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          <span className="text-slate-400 font-medium hidden sm:inline mr-1">Tools:</span>
+
+          <button
+            type="button"
+            onClick={() => setActiveTool("navigate")}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-all ${
+              activeTool === "navigate"
+                ? "bg-indigo-600 text-white shadow-sm"
+                : "bg-slate-800/80 text-slate-400 hover:text-white"
+            }`}
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+            </svg>
+            <span>Navigate</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTool("text")}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-all ${
+              activeTool === "text"
+                ? "bg-indigo-600 text-white shadow-sm"
+                : "bg-slate-800/80 text-slate-400 hover:text-white"
+            }`}
+          >
+            <span className="font-bold text-xs">T</span>
+            <span>Add Text</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTool("redact_black")}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-all ${
+              activeTool === "redact_black"
+                ? "bg-indigo-600 text-white shadow-sm"
+                : "bg-slate-800/80 text-slate-400 hover:text-white"
+            }`}
+          >
+            <span className="w-2.5 h-2.5 bg-black border border-slate-600 rounded-xs inline-block" />
+            <span>Blackout</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTool("redact_white")}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-all ${
+              activeTool === "redact_white"
+                ? "bg-indigo-600 text-white shadow-sm"
+                : "bg-slate-800/80 text-slate-400 hover:text-white"
+            }`}
+          >
+            <span className="w-2.5 h-2.5 bg-white border border-slate-400 rounded-xs inline-block" />
+            <span>Whiteout</span>
+          </button>
+        </div>
+
+        {/* Tip status */}
+        <div className="text-[11px] text-slate-400 hidden sm:block">
+          {activeTool === "navigate" && "Use arrow keys or buttons to browse pages"}
+          {activeTool === "text" && "Click anywhere on the page to place custom text"}
+          {activeTool === "redact_black" && "Click anywhere to blackout sensitive info"}
+          {activeTool === "redact_white" && "Click anywhere to erase/whiteout content"}
+        </div>
+      </div>
+
       {/* ── Main Preview Stage ────────────────────────────────────────── */}
       <div className="relative flex-1 flex items-center justify-center overflow-hidden">
-        
         {/* Prev Page Button */}
         <button
           type="button"
@@ -378,10 +526,7 @@ export default function PDFPreviewModal({
         </button>
 
         {/* Scrollable Document Container */}
-        <div
-          ref={containerRef}
-          className="w-full h-full overflow-auto flex items-center justify-center p-4 sm:p-8"
-        >
+        <div ref={containerRef} className="w-full h-full overflow-auto flex items-center justify-center p-4 sm:p-8">
           <div
             style={{
               transform: `scale(${zoom})`,
@@ -441,57 +586,152 @@ export default function PDFPreviewModal({
                 }
               />
             </Document>
+
+            {/* ── Interactive Annotation Overlay Layer ────────────────── */}
+            <div
+              onClick={handleCanvasClick}
+              className={`absolute inset-0 z-10 ${
+                activeTool !== "navigate" ? "cursor-crosshair" : "pointer-events-none"
+              }`}
+            >
+              {currentPageAnnotations.map((ann) => {
+                if (ann.type === "redact") {
+                  return (
+                    <div
+                      key={ann.id}
+                      data-annotation
+                      style={{
+                        left: `${ann.xRatio * 100}%`,
+                        top: `${ann.yRatio * 100}%`,
+                        width: `${(ann.widthRatio || 0.25) * 100}%`,
+                        height: `${(ann.heightRatio || 0.04) * 100}%`,
+                      }}
+                      className={`absolute group pointer-events-auto border rounded-xs select-none ${
+                        ann.redactStyle === "white"
+                          ? "bg-white border-slate-300 shadow-sm"
+                          : "bg-black border-slate-900"
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeAnnotation(ann.id);
+                        }}
+                        className="absolute -top-2.5 -right-2.5 w-5 h-5 rounded-full bg-rose-600 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-xs font-bold shadow-md cursor-pointer"
+                        title="Delete box"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  );
+                }
+
+                // Text annotation
+                return (
+                  <div
+                    key={ann.id}
+                    data-annotation
+                    style={{
+                      left: `${ann.xRatio * 100}%`,
+                      top: `${ann.yRatio * 100}%`,
+                    }}
+                    className="absolute group pointer-events-auto flex items-center gap-1 p-1 bg-slate-900/90 border border-slate-600 rounded-lg shadow-xl backdrop-blur-md"
+                  >
+                    <input
+                      type="text"
+                      value={ann.text || ""}
+                      onChange={(e) => updateAnnotationText(ann.id, e.target.value)}
+                      style={{
+                        fontSize: `${ann.fontSize || 14}px`,
+                        color:
+                          ann.color === "red"
+                            ? "#ef4444"
+                            : ann.color === "blue"
+                            ? "#3b82f6"
+                            : ann.color === "white"
+                            ? "#ffffff"
+                            : "#e2e8f0",
+                      }}
+                      className="bg-transparent border-none outline-none font-sans font-medium px-1 min-w-[80px]"
+                      placeholder="Type note..."
+                    />
+                    <div className="flex items-center gap-1">
+                      {/* Cycle color */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          cycleColor(ann.id);
+                        }}
+                        className="w-3.5 h-3.5 rounded-full border border-slate-500 cursor-pointer"
+                        style={{
+                          backgroundColor:
+                            ann.color === "red"
+                              ? "#ef4444"
+                              : ann.color === "blue"
+                              ? "#3b82f6"
+                              : ann.color === "white"
+                              ? "#ffffff"
+                              : "#1e293b",
+                        }}
+                        title="Change color"
+                      />
+                      {/* Delete */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeAnnotation(ann.id);
+                        }}
+                        className="w-4 h-4 rounded text-slate-400 hover:text-rose-400 text-xs flex items-center justify-center cursor-pointer"
+                        title="Delete note"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* ── Bottom Strip: Page Thumbnails / Jump Bar & Shortcuts ───────── */}
+      {/* ── Bottom Strip: Page Thumbnails Jump Bar ─────────────────────── */}
       <footer className="h-16 px-4 sm:px-6 bg-slate-950/90 border-t border-slate-800/80 flex items-center justify-between gap-4 sm:gap-6 shrink-0 overflow-hidden">
         {/* Quick jump pills */}
         <div
           ref={pillsContainerRef}
           onWheel={handlePillsWheel}
-          className="flex items-center gap-2 overflow-x-auto py-2 scrollbar-none flex-1 scroll-smooth"
+          className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-1 flex-1 min-w-0"
         >
-          {currentSequence.map((pg, idx) => {
-            const isPgSelected = selectedPages.includes(pg);
-            const isActive = pg === currentPage;
+          {currentSequence.map((num) => {
+            const isActive = num === currentPage;
+            const isSel = selectedPages.includes(num);
             return (
               <button
-                key={pg}
-                data-page={pg}
+                key={num}
+                data-page={num}
                 type="button"
                 onClick={() => {
                   setPageLoading(true);
-                  onPageChange(pg);
+                  onPageChange(num);
                 }}
-                className={`flex-shrink-0 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all relative ${
+                className={`flex-shrink-0 px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
                   isActive
-                    ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30 scale-105 ring-2 ring-indigo-400/50"
-                    : isPgSelected
-                    ? "bg-indigo-950/60 text-indigo-300 border border-indigo-700/40 hover:bg-indigo-900/60"
-                    : "bg-slate-900 text-slate-400 border border-slate-800 hover:text-slate-200 hover:border-slate-700"
+                    ? "bg-indigo-600 text-white font-bold shadow-md shadow-indigo-600/30 scale-105"
+                    : isSel
+                    ? "bg-slate-800 text-indigo-300 border border-indigo-500/30 hover:bg-slate-700"
+                    : "bg-slate-900 text-slate-400 hover:text-slate-200 hover:bg-slate-800"
                 }`}
-                title={`Go to page ${pg}`}
               >
-                <span>p.{pg}</span>
-                {isPgSelected && !isActive && (
-                  <span className="ml-1 w-1.5 h-1.5 rounded-full bg-indigo-400 inline-block align-middle" />
-                )}
+                p{num}
               </button>
             );
           })}
-        </div>
-
-        {/* Shortcuts reference text */}
-        <div className="hidden lg:flex items-center gap-3 text-[11px] text-slate-500 shrink-0 font-medium">
-          <span><kbd className="px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-400">←</kbd> <kbd className="px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-400">→</kbd> Navigate</span>
-          <span><kbd className="px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-400">Space</kbd> Toggle</span>
-          <span><kbd className="px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-400">R</kbd> Rotate</span>
-          <span><kbd className="px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-400">Esc</kbd> Close</span>
         </div>
       </footer>
     </div>
   );
 }
-

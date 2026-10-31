@@ -1,6 +1,6 @@
 import { IPdfRepository } from '../../domain/repositories/IPdfRepository';
 import { IStorageService } from '../../domain/services/IStorageService';
-import { PdfLibService, WatermarkOptions } from '../../infrastructure/pdf/PdfLibService';
+import { PdfLibService, WatermarkOptions, PDFAnnotation } from '../../infrastructure/pdf/PdfLibService';
 import { v4 as uuidv4 } from 'uuid';
 
 export interface ExtractResult {
@@ -20,7 +20,8 @@ export class ExtractPagesUseCase {
     pdfId: string,
     pages: number[],
     pageRotations?: Record<number, number>,
-    watermark?: WatermarkOptions
+    watermark?: WatermarkOptions,
+    annotations?: PDFAnnotation[]
   ): Promise<ExtractResult> {
     const doc = await this.pdfRepository.findById(pdfId);
     if (!doc) {
@@ -41,12 +42,13 @@ export class ExtractPagesUseCase {
     // 1. Fetch source PDF buffer from S3
     const sourceBuffer = await this.storageService.getFileBuffer(doc.s3Key);
 
-    // 2. Extract, rotate, and watermark pages using pdf-lib
+    // 2. Extract, rotate, watermark, and annotate pages using pdf-lib
     const extractedBytes = await this.pdfLibService.extractPages(
       sourceBuffer,
       pages,
       pageRotations,
-      watermark
+      watermark,
+      annotations
     );
 
     // 3. Upload extracted output directly to S3 outputs/

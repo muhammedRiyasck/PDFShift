@@ -24,6 +24,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import PDFIcon from "@/components/PDFIcon";
+import { PDFAnnotation } from "@/types/pdf";
 
 interface PdfInfo {
   id: string;
@@ -121,6 +122,7 @@ export default function PdfViewerPage() {
   const [previewPage, setPreviewPage] = useState<number>(1);
   const [previewMode, setPreviewMode] = useState<"all" | "selected">("all");
   const [pageRotations, setPageRotations] = useState<Record<number, number>>({});
+  const [annotations, setAnnotations] = useState<PDFAnnotation[]>([]);
 
   // Watermark state
   const [showWatermarkModal, setShowWatermarkModal] = useState(false);
@@ -222,6 +224,7 @@ export default function PdfViewerPage() {
               color: colorMap[watermarkColor],
             }
           : undefined,
+        annotations: annotations.length > 0 ? annotations : undefined,
       };
 
       const res = await axios.post(`${API_BASE}/api/pdf/${id}/extract`, payload);
@@ -622,6 +625,18 @@ export default function PdfViewerPage() {
                   </div>
                 )}
 
+                {/* Annotations badge */}
+                {annotations.filter((a) => a.pageNum === pageNum).length > 0 && (
+                  <div
+                    className="absolute top-2 z-10 px-1.5 py-0.5 rounded bg-emerald-950/90 border border-emerald-500/60 text-[10px] text-emerald-300 font-bold shadow-md flex items-center gap-1"
+                    style={{ right: isSelected ? "34px" : "8px" }}
+                    title={`${annotations.filter((a) => a.pageNum === pageNum).length} text/redaction annotation(s)`}
+                  >
+                    <span>✍️</span>
+                    <span>{annotations.filter((a) => a.pageNum === pageNum).length}</span>
+                  </div>
+                )}
+
                 {/* Hover overlay for unselected */}
                 {!isSelected && (
                   <div className="absolute inset-0 z-[5] bg-indigo-600/0 group-hover:bg-indigo-600/5 transition-colors" />
@@ -710,6 +725,8 @@ export default function PdfViewerPage() {
         initialMode={previewMode}
         pageRotations={pageRotations}
         onRotatePage={(p) => rotatePage(p)}
+        annotations={annotations}
+        onUpdateAnnotations={setAnnotations}
       />
 
       {/* ── Watermark & Stamp Modal ─────────────────────────────────── */}

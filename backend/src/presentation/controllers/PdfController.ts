@@ -89,10 +89,11 @@ export class PdfController {
   extractPages = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { id } = req.params;
-      const { pages, pageRotations, watermark } = req.body as {
+      const { pages, pageRotations, watermark, annotations } = req.body as {
         pages: number[];
         pageRotations?: Record<number, number>;
         watermark?: { text: string; opacity?: number; color?: { r: number; g: number; b: number } };
+        annotations?: any[];
       };
 
       if (!Array.isArray(pages) || pages.length === 0) {
@@ -100,7 +101,7 @@ export class PdfController {
         return;
       }
 
-      const result = await this.extractPagesUseCase.execute(id, pages, pageRotations, watermark);
+      const result = await this.extractPagesUseCase.execute(id, pages, pageRotations, watermark, annotations);
       res.json({
         downloadUrl: result.downloadUrl,
         filename: result.filename,
