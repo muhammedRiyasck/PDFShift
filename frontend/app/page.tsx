@@ -390,7 +390,22 @@ export default function HomePage() {
               <button
                 onClick={handleUpload}
                 disabled={isUploading}
-                className="mt-4 w-full py-3.5 px-6 rounded-2xl bg-indigo-600 hover:bg-indigo-500 active:scale-[0.99] text-white text-sm sm:text-base font-semibold shadow-lg shadow-indigo-600/30 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2.5 cursor-pointer"
+                className={`relative w-full mt-4 py-3.5 px-6 rounded-2xl
+                  inline-flex items-center justify-center gap-2.5
+                  overflow-hidden border backdrop-blur-xl
+                  text-sm sm:text-base font-semibold
+                  transition-all duration-300 ease-out
+                  ${
+                    !isUploading
+                      ? "bg-gradient-to-b from-indigo-500/25 to-indigo-700/20 border-indigo-400/40 text-indigo-100 shadow-[0_4px_20px_rgba(99,102,241,0.18)] hover:from-indigo-400/35 hover:to-indigo-600/30 hover:border-indigo-300/60 hover:text-white hover:shadow-[0_4px_25px_rgba(99,102,241,0.35)] hover:-translate-y-0.5 active:translate-y-0"
+                      : "bg-slate-800/40 border-white/5 text-slate-500 opacity-60 cursor-not-allowed"
+                  }
+                  before:absolute before:inset-0
+                  before:bg-gradient-to-r before:from-transparent before:via-white/15 before:to-transparent
+                  before:-translate-x-full
+                  before:transition-transform before:duration-700
+                  enabled:hover:before:translate-x-full
+                  disabled:cursor-not-allowed cursor-pointer`}
               >
                 {isUploading ? (
                   <>
@@ -531,7 +546,22 @@ export default function HomePage() {
                   type="button"
                   onClick={handleMerge}
                   disabled={isMerging || mergeFiles.length < 2}
-                  className="w-full mt-3 py-3.5 px-6 rounded-2xl bg-indigo-600 hover:bg-indigo-500 active:scale-[0.99] text-white text-sm sm:text-base font-semibold shadow-lg shadow-indigo-600/30 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  className={`relative w-full mt-3 py-3.5 px-6 rounded-2xl
+                    inline-flex items-center justify-center gap-2.5
+                    overflow-hidden border backdrop-blur-xl
+                    text-sm sm:text-base font-semibold
+                    transition-all duration-300 ease-out
+                    ${
+                      !isMerging && mergeFiles.length >= 2
+                        ? "bg-gradient-to-b from-indigo-500/25 to-indigo-700/20 border-indigo-400/40 text-indigo-100 shadow-[0_4px_20px_rgba(99,102,241,0.18)] hover:from-indigo-400/35 hover:to-indigo-600/30 hover:border-indigo-300/60 hover:text-white hover:shadow-[0_4px_25px_rgba(99,102,241,0.35)] hover:-translate-y-0.5 active:translate-y-0"
+                        : "bg-slate-800/40 border-white/5 text-slate-500 opacity-60 cursor-not-allowed"
+                    }
+                    before:absolute before:inset-0
+                    before:bg-gradient-to-r before:from-transparent before:via-white/15 before:to-transparent
+                    before:-translate-x-full
+                    before:transition-transform before:duration-700
+                    enabled:hover:before:translate-x-full
+                    disabled:cursor-not-allowed cursor-pointer`}
                 >
                   {isMerging ? (
                     <>

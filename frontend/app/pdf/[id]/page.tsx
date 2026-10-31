@@ -881,7 +881,7 @@ export default function PdfViewerPage() {
               <button
                 type="button"
                 onClick={() => setShowWatermarkModal(false)}
-                className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold transition-all shadow-md active:scale-95"
+                className="relative px-6 py-2 rounded-xl overflow-hidden border backdrop-blur-xl text-sm font-semibold transition-all duration-300 ease-out bg-gradient-to-b from-indigo-500/25 to-indigo-700/20 border-indigo-400/40 text-indigo-100 shadow-[0_4px_20px_rgba(99,102,241,0.18)] hover:from-indigo-400/35 hover:to-indigo-600/30 hover:border-indigo-300/60 hover:text-white hover:shadow-[0_4px_25px_rgba(99,102,241,0.35)] hover:-translate-y-0.5 active:translate-y-0 before:absolute before:inset-0 before:bg-gradient-to-r before:from-transparent before:via-white/15 before:to-transparent before:-translate-x-full before:transition-transform before:duration-700 hover:before:translate-x-full cursor-pointer"
               >
                 Done
               </button>

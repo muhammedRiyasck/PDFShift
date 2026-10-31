@@ -306,10 +306,10 @@ export default function PDFPreviewModal({
           <button
             type="button"
             onClick={() => onToggleSelect(currentPage)}
-            className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all active:scale-[0.98] ${
+            className={`relative inline-flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold overflow-hidden border backdrop-blur-xl transition-all duration-300 ease-out active:translate-y-0 before:absolute before:inset-0 before:bg-gradient-to-r before:from-transparent before:via-white/15 before:to-transparent before:-translate-x-full before:transition-transform before:duration-700 hover:before:translate-x-full cursor-pointer ${
               isSelected
-                ? "bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/30"
-                : "bg-slate-900 border border-slate-700 text-slate-300 hover:border-slate-500 hover:text-white"
+                ? "bg-gradient-to-b from-indigo-500/30 to-indigo-700/25 border-indigo-400/50 text-white shadow-[0_4px_20px_rgba(99,102,241,0.25)] hover:from-indigo-400/40 hover:to-indigo-600/35 hover:border-indigo-300/70 hover:shadow-[0_4px_25px_rgba(99,102,241,0.4)] hover:-translate-y-0.5"
+                : "bg-slate-900/60 border-slate-700/80 text-slate-300 hover:border-slate-500 hover:text-white hover:bg-slate-800/80 hover:-translate-y-0.5"
             }`}
           >
             {isSelected ? (
