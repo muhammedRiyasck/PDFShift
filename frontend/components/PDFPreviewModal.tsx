@@ -51,6 +51,7 @@ export default function PDFPreviewModal({
 
   const containerRef = useRef<HTMLDivElement>(null);
   const pillsContainerRef = useRef<HTMLDivElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll the active page pill into view whenever currentPage changes or modal opens
   useEffect(() => {
@@ -226,9 +227,11 @@ export default function PDFPreviewModal({
     if (activeTool === "navigate") return;
     if ((e.target as HTMLElement).closest("[data-annotation]")) return;
 
-    const rect = e.currentTarget.getBoundingClientRect();
-    const xRatio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-    const yRatio = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
+    const overlayEl = overlayRef.current;
+    if (!overlayEl) return;
+    const rect = overlayEl.getBoundingClientRect();
+    const xRatio = Math.max(0, Math.min(0.85, (e.clientX - rect.left) / rect.width));
+    const yRatio = Math.max(0, Math.min(0.95, (e.clientY - rect.top) / rect.height));
 
     if (activeTool === "text") {
       const newAnn: PDFAnnotation = {
@@ -247,8 +250,8 @@ export default function PDFPreviewModal({
         id: "ann-" + Date.now(),
         pageNum: currentPage,
         type: "redact",
-        xRatio: Math.max(0, xRatio - 0.1),
-        yRatio: Math.max(0, yRatio - 0.02),
+        xRatio: Math.max(0, Math.min(0.7, xRatio)),
+        yRatio: Math.max(0, Math.min(0.95, yRatio)),
         widthRatio: 0.25,
         heightRatio: 0.04,
         redactStyle: "black",
@@ -259,14 +262,95 @@ export default function PDFPreviewModal({
         id: "ann-" + Date.now(),
         pageNum: currentPage,
         type: "redact",
-        xRatio: Math.max(0, xRatio - 0.1),
-        yRatio: Math.max(0, yRatio - 0.02),
+        xRatio: Math.max(0, Math.min(0.7, xRatio)),
+        yRatio: Math.max(0, Math.min(0.95, yRatio)),
         widthRatio: 0.25,
         heightRatio: 0.04,
         redactStyle: "white",
       };
       onUpdateAnnotations?.([...annotations, newAnn]);
     }
+  };
+
+  /* ── Drag & Resize Handlers ────────────────────────────────────────── */
+  const startDrag = (
+    id: string,
+    e: React.PointerEvent,
+    initialXRatio: number,
+    initialYRatio: number
+  ) => {
+    if (e.button !== 0) return;
+    e.stopPropagation();
+    e.preventDefault();
+
+    const overlayEl = overlayRef.current;
+    if (!overlayEl) return;
+    const overlayRect = overlayEl.getBoundingClientRect();
+    const startClientX = e.clientX;
+    const startClientY = e.clientY;
+
+    const onPointerMove = (moveEvent: PointerEvent) => {
+      const deltaX = (moveEvent.clientX - startClientX) / overlayRect.width;
+      const deltaY = (moveEvent.clientY - startClientY) / overlayRect.height;
+
+      onUpdateAnnotations?.(
+        annotations.map((a) => {
+          if (a.id !== id) return a;
+          const maxW = a.widthRatio || 0.15;
+          const maxH = a.heightRatio || 0.04;
+          const newX = Math.max(0, Math.min(1 - maxW, initialXRatio + deltaX));
+          const newY = Math.max(0, Math.min(1 - maxH, initialYRatio + deltaY));
+          return { ...a, xRatio: newX, yRatio: newY };
+        })
+      );
+    };
+
+    const onPointerUp = () => {
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerUp);
+    };
+
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", onPointerUp);
+  };
+
+  const startResize = (
+    id: string,
+    e: React.PointerEvent,
+    initialWRatio: number,
+    initialHRatio: number
+  ) => {
+    if (e.button !== 0) return;
+    e.stopPropagation();
+    e.preventDefault();
+
+    const overlayEl = overlayRef.current;
+    if (!overlayEl) return;
+    const overlayRect = overlayEl.getBoundingClientRect();
+    const startClientX = e.clientX;
+    const startClientY = e.clientY;
+
+    const onPointerMove = (moveEvent: PointerEvent) => {
+      const deltaW = (moveEvent.clientX - startClientX) / overlayRect.width;
+      const deltaH = (moveEvent.clientY - startClientY) / overlayRect.height;
+
+      onUpdateAnnotations?.(
+        annotations.map((a) => {
+          if (a.id !== id) return a;
+          const newW = Math.max(0.04, Math.min(1 - a.xRatio, initialWRatio + deltaW));
+          const newH = Math.max(0.02, Math.min(1 - a.yRatio, initialHRatio + deltaH));
+          return { ...a, widthRatio: newW, heightRatio: newH };
+        })
+      );
+    };
+
+    const onPointerUp = () => {
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerUp);
+    };
+
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", onPointerUp);
   };
 
   if (!isOpen) return null;
@@ -488,10 +572,10 @@ export default function PDFPreviewModal({
 
         {/* Tip status */}
         <div className="text-[11px] text-slate-400 hidden sm:block">
-          {activeTool === "navigate" && "Use arrow keys or buttons to browse pages"}
-          {activeTool === "text" && "Click anywhere on the page to place custom text"}
-          {activeTool === "redact_black" && "Click anywhere to blackout sensitive info"}
-          {activeTool === "redact_white" && "Click anywhere to erase/whiteout content"}
+          {activeTool === "navigate" && "Drag items to move • Hover edge to resize"}
+          {activeTool === "text" && "Click page to add text note • Drag ⠿ to move"}
+          {activeTool === "redact_black" && "Click page to add blackout • Drag to move • Corner to resize"}
+          {activeTool === "redact_white" && "Click page to erase/whiteout • Drag to move • Corner to resize"}
         </div>
       </div>
 
@@ -589,9 +673,12 @@ export default function PDFPreviewModal({
 
             {/* ── Interactive Annotation Overlay Layer ────────────────── */}
             <div
+              ref={overlayRef}
               onClick={handleCanvasClick}
               className={`absolute inset-0 z-10 ${
-                activeTool !== "navigate" ? "cursor-crosshair" : "pointer-events-none"
+                activeTool !== "navigate"
+                  ? "cursor-crosshair pointer-events-auto"
+                  : "pointer-events-none"
               }`}
             >
               {currentPageAnnotations.map((ann) => {
@@ -600,29 +687,47 @@ export default function PDFPreviewModal({
                     <div
                       key={ann.id}
                       data-annotation
+                      onPointerDown={(e) =>
+                        startDrag(ann.id, e, ann.xRatio, ann.yRatio)
+                      }
                       style={{
                         left: `${ann.xRatio * 100}%`,
                         top: `${ann.yRatio * 100}%`,
                         width: `${(ann.widthRatio || 0.25) * 100}%`,
                         height: `${(ann.heightRatio || 0.04) * 100}%`,
                       }}
-                      className={`absolute group pointer-events-auto border rounded-xs select-none ${
+                      className={`absolute group pointer-events-auto border rounded-xs select-none cursor-move touch-none ${
                         ann.redactStyle === "white"
                           ? "bg-white border-slate-300 shadow-sm"
                           : "bg-black border-slate-900"
                       }`}
                     >
+                      {/* Delete button (top-right) */}
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           removeAnnotation(ann.id);
                         }}
-                        className="absolute -top-2.5 -right-2.5 w-5 h-5 rounded-full bg-rose-600 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-xs font-bold shadow-md cursor-pointer"
+                        className="absolute -top-3 -right-3 w-5 h-5 rounded-full bg-rose-600 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-xs font-bold shadow-md cursor-pointer z-20"
                         title="Delete box"
                       >
                         ×
                       </button>
+
+                      {/* Resize handle (bottom-right) */}
+                      <div
+                        onPointerDown={(e) =>
+                          startResize(
+                            ann.id,
+                            e,
+                            ann.widthRatio || 0.25,
+                            ann.heightRatio || 0.04
+                          )
+                        }
+                        className="absolute -bottom-1.5 -right-1.5 w-3.5 h-3.5 bg-indigo-500 border border-white rounded-full cursor-nwse-resize opacity-0 group-hover:opacity-100 transition-opacity z-20 shadow-sm"
+                        title="Drag corner to resize box"
+                      />
                     </div>
                   );
                 }
@@ -636,8 +741,21 @@ export default function PDFPreviewModal({
                       left: `${ann.xRatio * 100}%`,
                       top: `${ann.yRatio * 100}%`,
                     }}
-                    className="absolute group pointer-events-auto flex items-center gap-1 p-1 bg-slate-900/90 border border-slate-600 rounded-lg shadow-xl backdrop-blur-md"
+                    className="absolute group pointer-events-auto flex items-center gap-1 p-1 bg-slate-900/95 border border-slate-600 rounded-lg shadow-xl backdrop-blur-md select-none touch-none"
                   >
+                    {/* Drag Grip Handle */}
+                    <div
+                      onPointerDown={(e) =>
+                        startDrag(ann.id, e, ann.xRatio, ann.yRatio)
+                      }
+                      className="cursor-grab active:cursor-grabbing px-1 py-0.5 text-slate-400 hover:text-white flex items-center justify-center select-none"
+                      title="Drag to move text note"
+                    >
+                      <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M7 2a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 2zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 8zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 14zm6-12a2 2 0 1 0 .001 4.001A2 2 0 0 0 13 2zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 13 8zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 13 14z" />
+                      </svg>
+                    </div>
+
                     <input
                       type="text"
                       value={ann.text || ""}
@@ -656,6 +774,7 @@ export default function PDFPreviewModal({
                       className="bg-transparent border-none outline-none font-sans font-medium px-1 min-w-[80px]"
                       placeholder="Type note..."
                     />
+
                     <div className="flex items-center gap-1">
                       {/* Cycle color */}
                       <button
