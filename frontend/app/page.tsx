@@ -229,29 +229,84 @@ export default function HomePage() {
           </span>
         </div>
 
-        <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight text-white mb-3 leading-tight">
-          {activeTab === "extract" ? (
-            <>
-              Shift, Reorder & Extract <br className="hidden sm:inline" />
-              <span className="bg-gradient-to-r from-indigo-400 via-purple-300 to-indigo-200 bg-clip-text text-transparent">
-                Pages from any PDF
-              </span>
-            </>
-          ) : (
-            <>
-              Combine & Merge <br className="hidden sm:inline" />
-              <span className="bg-gradient-to-r from-indigo-400 via-purple-300 to-indigo-200 bg-clip-text text-transparent">
-                Multiple PDFs in Seconds
-              </span>
-            </>
-          )}
-        </h1>
+        {/* Mobile hero text — same-cell grid trick:
+            All 3 divs share grid-area 1/1 at FULL width.
+            Container height = max(extract, merge) — no half-width wrapping issue. */}
+        <div className="sm:hidden grid">
+          {/* Ghost A: Extract content (invisible, full width) */}
+          <div aria-hidden className="[grid-area:1/1] invisible pointer-events-none select-none flex flex-col gap-2.5">
+            <h1 className="text-[1.75rem] font-extrabold tracking-tight leading-snug">
+              Reorder & Extract{" "}
+              <span>Pages from any PDF</span>
+            </h1>
+            <p className="text-sm leading-relaxed">
+              Upload your document, visually select the pages you need, drag to shift sequence,edit,add stamp and more to your pdf.
+            </p>
+          </div>
 
-        <p className="text-slate-400 text-sm sm:text-base leading-relaxed max-w-xl mx-auto">
-          {activeTab === "extract"
-            ? "Upload your document, visually select the pages you need, drag to shift sequence, and download."
-            : "Select multiple PDF files, arrange them into your preferred reading sequence, and combine them into one document."}
-        </p>
+          {/* Ghost B: Merge content (invisible, full width) */}
+          <div aria-hidden className="[grid-area:1/1] invisible pointer-events-none select-none flex flex-col gap-2.5">
+            <h1 className="text-[1.75rem] font-extrabold tracking-tight leading-snug">
+              Combine & Merge{" "}
+              <span>Multiple PDFs in Seconds</span>
+            </h1>
+            <p className="text-sm leading-relaxed">
+              Select multiple PDF files, arrange them into your preferred reading sequence, and combine them into one document.
+            </p>
+          </div>
+
+          {/* Real visible content — same cell, always on top */}
+          <div className="[grid-area:1/1] flex flex-col gap-2.5">
+            <h1 className="text-[1.75rem] font-extrabold tracking-tight text-white leading-snug">
+              {activeTab === "extract" ? (
+                <>
+                  Reorder & Extract{" "}
+                  <span className="bg-gradient-to-r from-indigo-400 via-purple-300 to-indigo-200 bg-clip-text text-transparent">
+                    Pages from any PDF
+                  </span>
+                </>
+              ) : (
+                <>
+                  Combine & Merge{" "}
+                  <span className="bg-gradient-to-r from-indigo-400 via-purple-300 to-indigo-200 bg-clip-text text-transparent">
+                    Multiple PDFs in Seconds
+                  </span>
+                </>
+              )}
+            </h1>
+            <p className="text-slate-400 text-sm leading-relaxed">
+              {activeTab === "extract"
+                ? "Upload your document, visually select the pages you need, drag to shift sequence,edit,add stamp and more to your pdf."
+                : "Select multiple PDF files, arrange them into your preferred reading sequence, and combine them into one document."}
+            </p>
+          </div>
+        </div>
+
+        {/* Desktop/tablet (sm+): normal flow, no fixed height needed */}
+        <div className="hidden sm:block">
+          <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-white mb-3 leading-tight">
+            {activeTab === "extract" ? (
+              <>
+                Shift, Reorder & Extract <br />
+                <span className="bg-gradient-to-r from-indigo-400 via-purple-300 to-indigo-200 bg-clip-text text-transparent">
+                  Pages from any PDF
+                </span>
+              </>
+            ) : (
+              <>
+                Combine & Merge <br />
+                <span className="bg-gradient-to-r from-indigo-400 via-purple-300 to-indigo-200 bg-clip-text text-transparent">
+                  Multiple PDFs in Seconds
+                </span>
+              </>
+            )}
+          </h1>
+          <p className="text-slate-400 text-base leading-relaxed max-w-xl mx-auto">
+            {activeTab === "extract"
+              ? "Upload your document, visually select the pages you need, drag to shift sequence, and download."
+              : "Select multiple PDF files, arrange them into your preferred reading sequence, and combine them into one document."}
+          </p>
+        </div>
 
         {/* Feature Mode Switcher Tabs */}
         <div className="flex items-center justify-center gap-2 mt-6">
@@ -292,8 +347,8 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* Main Card */}
-      <div className="relative w-full max-w-xl px-0 sm:px-2">
+      {/* Main Card — fixed min-height on mobile/tablet prevents layout jump on tab switch */}
+      <div className="relative w-full max-w-xl px-0 sm:px-2 min-h-[220px] sm:min-h-0">
         {/* Hidden File Input */}
         <input
           id="file-input"
@@ -315,7 +370,7 @@ export default function HomePage() {
               onDragLeave={() => setIsDragging(false)}
               onDrop={handleDrop}
               onClick={() => document.getElementById("file-input")?.click()}
-              className={`relative group border-2 border-dashed rounded-2xl sm:rounded-3xl p-6 sm:p-10 md:p-12 text-center cursor-pointer transition-all duration-300 backdrop-blur-xl ${
+              className={`relative group border-2 border-dashed rounded-2xl sm:rounded-3xl p-6 sm:p-10 md:p-12 min-h-[200px] sm:min-h-0 flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-300 backdrop-blur-xl ${
                 isDragging
                   ? "border-indigo-400 bg-indigo-500/15 shadow-2xl shadow-indigo-500/20 scale-[1.01]"
                   : selectedFile
@@ -374,14 +429,7 @@ export default function HomePage() {
                     </p>
                   </div>
 
-                  <div className="pt-1 sm:pt-2">
-                    <span className="inline-flex items-center gap-1.5 px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl bg-slate-800/80 border border-slate-700/80 text-xs sm:text-sm font-medium text-slate-200 group-hover:bg-indigo-600 group-hover:border-indigo-500 group-hover:text-white transition-all shadow-sm">
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                      </svg>
-                      Browse Computer
-                    </span>
-                  </div>
+              
                 </div>
               )}
             </div>
@@ -440,23 +488,23 @@ export default function HomePage() {
               onDragLeave={() => setIsDragging(false)}
               onDrop={handleDrop}
               onClick={() => document.getElementById("file-input")?.click()}
-              className={`border-2 border-dashed rounded-2xl sm:rounded-3xl p-6 text-center cursor-pointer transition-all duration-300 backdrop-blur-xl ${
+              className={`border-2 border-dashed rounded-2xl sm:rounded-3xl p-6 sm:p-10 md:p-12 min-h-[200px] sm:min-h-0 text-center cursor-pointer transition-all duration-300 backdrop-blur-xl ${
                 isDragging
                   ? "border-indigo-400 bg-indigo-500/15 shadow-2xl scale-[1.01]"
                   : "border-slate-800 bg-slate-900/40 hover:border-indigo-500/40 hover:bg-slate-900/60"
               }`}
             >
-              <div className="flex flex-col items-center justify-center gap-2">
-                <div className="w-12 h-12 rounded-xl bg-indigo-600/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
-                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className="flex flex-col items-center justify-center gap-3.5 sm:gap-4">
+                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-indigo-600/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+                  <svg className="w-7 h-7 sm:w-8 sm:h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                   </svg>
                 </div>
                 <div>
-                  <p className="text-white font-semibold text-sm sm:text-base">
+                  <p className="text-white font-semibold text-base sm:text-lg">
                     Click to select multiple PDFs or drag them here
                   </p>
-                  <p className="text-slate-500 text-xs mt-0.5">
+                  <p className="text-slate-400 text-xs sm:text-sm mt-1">
                     Select 2 or more files to combine into one
                   </p>
                 </div>
