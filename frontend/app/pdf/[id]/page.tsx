@@ -536,14 +536,19 @@ export default function PdfViewerPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
               </div>
-              <div>
-                <p className="text-emerald-300 font-semibold text-sm">
-                  {extractedCount} {extractedCount !== 1 ? "pages" : "page"} extracted successfully!
-                </p>
-                <p className="text-slate-400 text-xs mt-0.5">
-                  Download started automatically — use the button below to re-download.
-                </p>
-              </div>
+             <div>
+              <p className="text-emerald-300 font-semibold text-sm">
+                {extractedCount} {extractedCount !== 1 ? "pages" : "page"} extracted successfully!
+              </p>
+              <p className="text-slate-400 text-xs mt-0.5">
+                Download started automatically — use the button below to re-download.
+              </p>
+              <p className="text-amber-300 text-xs mt-1.5">
+                <span className="font-semibold">Note:</span> Any changes made after extraction
+                won't be included in this download. Click the Extract button again to
+                generate a new download with your latest changes.
+              </p>
+           </div>
             </div>
             <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
               <a
