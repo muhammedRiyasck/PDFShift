@@ -19,6 +19,9 @@ const PORT = process.env.PORT || 4000;
 app.use(cors());
 app.use(express.json());
 
+// Health check (keeps Render free tier alive via external pinger)
+app.get('/health', (_req, res) => res.json({ status: 'ok' }));
+
 // Routes
 app.use('/api', createPdfRouter(pdfController));
 
