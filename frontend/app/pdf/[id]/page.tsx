@@ -96,9 +96,9 @@ function SortablePageItem({ page, index, onRemove, onPreview }: SortablePageItem
         type="button"
         onClick={(e) => { e.stopPropagation(); onRemove(page); }}
         aria-label={`Remove page ${page}`}
-        className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-rose-500 hover:bg-rose-400 active:scale-90 text-white flex items-center justify-center shadow-md transition-all opacity-100 sm:opacity-0 sm:group-hover:opacity-100 z-10"
+        className="absolute -top-2 -right-2 sm:-top-1.5 sm:-right-1.5 w-6 h-6 sm:w-5 sm:h-5 rounded-full bg-rose-500 hover:bg-rose-400 active:scale-90 text-white flex items-center justify-center shadow-md transition-all opacity-100 sm:opacity-0 sm:group-hover:opacity-100 z-10"
       >
-        <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+        <svg className="w-3 h-3 sm:w-2.5 sm:h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
         </svg>
       </button>
@@ -311,16 +311,16 @@ export default function PdfViewerPage() {
       <header className="sticky top-0 z-40 bg-slate-950/95 backdrop-blur-md border-b border-slate-800/80">
 
         {/* Main nav row */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-[60px] flex items-center gap-3 sm:gap-4">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 h-[60px] flex items-center gap-2 sm:gap-4">
 
           {/* Back + Brand */}
           <button
             onClick={() => router.push("/")}
             title="Back to home"
-            className="flex items-center gap-3 shrink-0 group"
+            className="flex items-center gap-2 sm:gap-3 shrink-0 group"
           >
             {/* Back icon */}
-            <div className="w-9 h-9 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400 group-hover:text-white group-hover:border-indigo-500/50 group-hover:bg-slate-800/80 transition-all">
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400 group-hover:text-white group-hover:border-indigo-500/50 group-hover:bg-slate-800/80 transition-all">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
               </svg>
@@ -343,14 +343,14 @@ export default function PdfViewerPage() {
           <div className="hidden sm:block w-px h-7 bg-slate-800/80 shrink-0" />
 
           {/* File info */}
-          <div className="flex-1 min-w-0 flex items-center gap-2.5">
+          <div className="flex-1 min-w-0 flex items-center gap-2">
             {/* PDF icon chip */}
-            <div className="hidden xs:flex shrink-0">
+            <div className="hidden sm:flex shrink-0">
               <PDFIcon size={34} />
             </div>
             <div className="min-w-0">
               <h1
-                className="text-white font-semibold truncate text-sm sm:text-[15px] leading-tight"
+                className="text-white font-semibold truncate text-xs sm:text-[15px] leading-tight"
                 title={pdfInfo.originalName}
               >
                 {pdfInfo.originalName}
@@ -368,7 +368,7 @@ export default function PdfViewerPage() {
           </div>
 
           {/* Action buttons */}
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             {/* Select All — desktop */}
             <button
               onClick={selectAll}
@@ -398,7 +398,7 @@ export default function PdfViewerPage() {
             <button
               onClick={() => setShowWatermarkModal(true)}
               title="Add a watermark stamp or page numbers"
-              className={`inline-flex items-center gap-1.5 text-sm px-3.5 py-2 rounded-xl border transition-all font-medium active:scale-[0.98] ${
+              className={`inline-flex items-center gap-1.5 rounded-xl border transition-all font-medium active:scale-[0.98] px-2 py-2 sm:px-3.5 sm:text-sm ${
                 watermarkEnabled || pageNumbersEnabled
                   ? "bg-amber-500/15 border-amber-500/50 text-amber-300 shadow-sm shadow-amber-500/20"
                   : "border-slate-700/80 bg-slate-900/50 text-slate-300 hover:bg-slate-800 hover:border-slate-600 hover:text-white"
@@ -407,7 +407,7 @@ export default function PdfViewerPage() {
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
-              <span>Stamp & Numbers</span>
+              <span className="hidden sm:inline">Stamp & Numbers</span>
               {(watermarkEnabled || pageNumbersEnabled) && (
                 <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse ml-0.5" />
               )}
@@ -417,7 +417,7 @@ export default function PdfViewerPage() {
             <button
               onClick={handleExtract}
               disabled={isExtracting || !hasSelection}
-             className={`relative inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl
+             className={`relative inline-flex items-center justify-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2 rounded-xl
               overflow-hidden
               border backdrop-blur-xl
               text-sm font-semibold
@@ -440,14 +440,14 @@ export default function PdfViewerPage() {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                   </svg>
-                  <span>Extracting…</span>
+                  <span className="hidden sm:inline">Extracting…</span>
                 </>
               ) : (
                 <>
                   <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                   </svg>
-                  <span>
+                  <span className="hidden sm:inline">
                     Extract
                     {hasSelection && (
                       <span className="ml-1.5 bg-white/20 rounded px-1.5 py-0.5 text-xs font-bold tabular-nums">
@@ -455,6 +455,11 @@ export default function PdfViewerPage() {
                       </span>
                     )}
                   </span>
+                  {hasSelection && (
+                    <span className="sm:hidden bg-white/20 rounded px-1 py-0.5 text-xs font-bold tabular-nums">
+                      {selectedPages.length}
+                    </span>
+                  )}
                 </>
               )}
             </button>
