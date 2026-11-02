@@ -164,16 +164,33 @@ export default function PdfViewerPage() {
 
   useEffect(() => {
     const fetchInfo = async () => {
-      try {
-        const res = await axios.get(`${API_BASE}/api/pdf/${id}/info`);
-        setPdfInfo(res.data);
-        setPdfUrl(`${API_BASE}/api/pdf/${id}/file`);
-      } catch {
-        toast.error("PDF not found");
-        router.push("/");
-      } finally {
-        setLoading(false);
+      const MAX_RETRIES = 3;
+      const RETRY_DELAY_MS = 3000; // 3 s — gives Render free-tier time to wake up
+
+      for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        try {
+          const res = await axios.get(`${API_BASE}/api/pdf/${id}/info`, {
+            timeout: 15000, // 15 s timeout per attempt
+          });
+          setPdfInfo(res.data);
+          setPdfUrl(`${API_BASE}/api/pdf/${id}/file`);
+          setLoading(false);
+          return;
+        } catch (err) {
+          if (attempt < MAX_RETRIES) {
+            // Show a friendly message while we wait for the server to wake
+            toast.loading(`Server waking up… (${attempt}/${MAX_RETRIES})`, {
+              id: "fetch-retry",
+            });
+            await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
+          } else {
+            toast.dismiss("fetch-retry");
+            toast.error("Could not load PDF. Please try again.");
+            router.push("/");
+          }
+        }
       }
+      setLoading(false);
     };
     fetchInfo();
   }, [id, router]);

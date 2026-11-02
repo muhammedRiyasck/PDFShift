@@ -16,7 +16,24 @@ import { pdfController } from './container';
 const app = express();
 const PORT = process.env.PORT || 4000;
 
-app.use(cors());
+// If ALLOWED_ORIGINS is set, restrict to those; otherwise allow all origins (open API).
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim())
+  : null;
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Always allow requests with no origin (mobile apps, curl, Postman, server-to-server)
+      if (!origin) return callback(null, true);
+      // If no whitelist configured, allow all origins
+      if (!allowedOrigins) return callback(null, true);
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+      callback(new Error(`CORS: origin '${origin}' not allowed`));
+    },
+    credentials: true,
+  })
+);
 app.use(express.json());
 
 // Health check (keeps Render free tier alive via external pinger)
