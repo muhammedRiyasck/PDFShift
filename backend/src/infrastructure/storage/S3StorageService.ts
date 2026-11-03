@@ -68,10 +68,13 @@ export class S3StorageService implements IStorageService {
     const bucket = this.getBucket();
     const client = this.getClient();
 
+    // Note: We intentionally do NOT include ContentType in PutObjectCommand for presigning.
+    // If ContentType is signed into S3's signature, mobile browsers (like Chrome on Android)
+    // that alter Content-Type (e.g. adding charset or sending application/octet-stream for picked files)
+    // get rejected by S3 with 403 SignatureDoesNotMatch, which displays as "Network Error".
     const command = new PutObjectCommand({
       Bucket: bucket,
       Key: key,
-      ContentType: contentType,
     });
 
     return getSignedUrl(client, command, { expiresIn: expiresInSeconds });

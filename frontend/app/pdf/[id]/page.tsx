@@ -163,36 +163,51 @@ export default function PdfViewerPage() {
   );
 
   useEffect(() => {
+    if (!id || typeof id !== "string") return;
+
+    let isCancelled = false;
+
     const fetchInfo = async () => {
       const MAX_RETRIES = 3;
-      const RETRY_DELAY_MS = 3000; // 3 s — gives Render free-tier time to wake up
+      const RETRY_DELAY_MS = 2500;
 
       for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        if (isCancelled) return;
         try {
           const res = await axios.get(`${API_BASE}/api/pdf/${id}/info`, {
-            timeout: 15000, // 15 s timeout per attempt
+            timeout: 15000,
           });
+          if (isCancelled) return;
+          toast.dismiss("fetch-retry");
           setPdfInfo(res.data);
           setPdfUrl(`${API_BASE}/api/pdf/${id}/file`);
           setLoading(false);
           return;
-        } catch (err) {
+        } catch (err: unknown) {
+          if (isCancelled) return;
+          console.error(`Attempt ${attempt} to fetch PDF info failed:`, err);
           if (attempt < MAX_RETRIES) {
-            // Show a friendly message while we wait for the server to wake
-            toast.loading(`Server waking up… (${attempt}/${MAX_RETRIES})`, {
+            toast.loading(`Loading document… (${attempt}/${MAX_RETRIES})`, {
               id: "fetch-retry",
             });
             await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
           } else {
             toast.dismiss("fetch-retry");
-            toast.error("Could not load PDF. Please try again.");
+            const msg = axios.isAxiosError(err) ? err.response?.data?.error || err.message : "Document not found";
+            toast.error(`Could not load document: ${msg}`);
             router.push("/");
           }
         }
       }
-      setLoading(false);
+      if (!isCancelled) setLoading(false);
     };
+
     fetchInfo();
+
+    return () => {
+      isCancelled = true;
+      toast.dismiss("fetch-retry");
+    };
   }, [id, router]);
 
   const togglePage = useCallback((pageNum: number) => {

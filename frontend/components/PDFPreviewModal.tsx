@@ -7,7 +7,7 @@ import "react-pdf/dist/Page/TextLayer.css";
 import { PDFAnnotation } from "@/types/pdf";
 
 if (typeof window !== "undefined") {
-  pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
+  pdfjs.GlobalWorkerOptions.workerSrc = `${window.location.origin}/pdf.worker.min.mjs`;
 }
 
 interface PDFPreviewModalProps {

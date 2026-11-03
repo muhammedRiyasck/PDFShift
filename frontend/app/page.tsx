@@ -41,28 +41,52 @@ export default function HomePage() {
   };
 
   const uploadSingleFileToS3 = async (file: File): Promise<string> => {
+    const effectiveContentType = file.type && file.type.length > 0 ? file.type : "application/pdf";
+
     // 1. Request presigned upload URL from backend
-    const presignRes = await axios.post(`${API_BASE}/api/presign-upload`, {
-      filename: file.name,
-      contentType: file.type || "application/pdf",
-    });
+    let presignRes;
+    try {
+      presignRes = await axios.post(`${API_BASE}/api/presign-upload`, {
+        filename: file.name,
+        contentType: effectiveContentType,
+      });
+    } catch (err: unknown) {
+      const msg = axios.isAxiosError(err) ? err.response?.data?.error || err.message : String(err);
+      throw new Error(`Step 1 (Presign) failed: ${msg}`);
+    }
 
     const { id, uploadUrl, s3Key } = presignRes.data;
 
-    // 2. Direct upload to AWS S3 via PUT
-    await axios.put(uploadUrl, file, {
-      headers: {
-        "Content-Type": file.type || "application/pdf",
-      },
-    });
+    // 2. Direct upload to AWS S3 via native fetch PUT (resilient on mobile browsers)
+    try {
+      const uploadRes = await fetch(uploadUrl, {
+        method: "PUT",
+        body: file,
+        headers: {
+          "Content-Type": effectiveContentType,
+        },
+      });
+
+      if (!uploadRes.ok) {
+        throw new Error(`S3 rejected upload with HTTP status ${uploadRes.status}`);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new Error(`Step 2 (Storage Upload) failed: ${msg}`);
+    }
 
     // 3. Confirm upload with backend to register metadata & page count
-    await axios.post(`${API_BASE}/api/confirm-upload`, {
-      id,
-      s3Key,
-      originalName: file.name,
-      fileSize: file.size,
-    });
+    try {
+      await axios.post(`${API_BASE}/api/confirm-upload`, {
+        id,
+        s3Key,
+        originalName: file.name,
+        fileSize: file.size,
+      });
+    } catch (err: unknown) {
+      const msg = axios.isAxiosError(err) ? err.response?.data?.error || err.message : String(err);
+      throw new Error(`Step 3 (Confirm) failed: ${msg}`);
+    }
 
     return id;
   };
@@ -76,10 +100,12 @@ export default function HomePage() {
       router.push(`/pdf/${id}`);
     } catch (err: unknown) {
       const message =
-        axios.isAxiosError(err)
+        err instanceof Error
+          ? err.message
+          : axios.isAxiosError(err)
           ? err.response?.data?.error || err.message
           : "Failed to load document securely. Please try again.";
-      toast.error(message);
+      toast.error(message, { duration: 5000 });
     } finally {
       setIsUploading(false);
     }
