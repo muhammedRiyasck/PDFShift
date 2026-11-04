@@ -12,7 +12,8 @@ import {
   DndContext,
   closestCenter,
   KeyboardSensor,
-  PointerSensor,
+  MouseSensor,
+  TouchSensor,
   useSensor,
   useSensors,
   DragEndEvent,
@@ -66,21 +67,26 @@ function SortablePageItem({ page, index, onRemove, onPreview }: SortablePageItem
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: page });
 
-  const style = {
+  const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.4 : 1,
+    opacity: isDragging ? 0.5 : 1,
     zIndex: isDragging ? 50 : undefined,
+    touchAction: "none",
   };
 
   return (
-    <div ref={setNodeRef} style={style} className="flex-shrink-0 relative group touch-manipulation overflow-visible">
+    <div ref={setNodeRef} style={style} className="flex-shrink-0 relative group touch-none select-none overflow-visible">
       <div
         {...attributes}
         {...listeners}
         onClick={() => onPreview(page)}
-        title="Drag to rearrange, or click to preview"
-        className="w-14 h-14 rounded-xl bg-slate-800 border border-slate-700 hover:border-indigo-500/60 hover:bg-indigo-600/10 flex flex-col items-center justify-center cursor-grab active:cursor-grabbing transition-all select-none shadow-sm relative group"
+        title="Hold & drag to rearrange, or click to preview"
+        className={`w-14 h-14 rounded-xl border flex flex-col items-center justify-center cursor-grab active:cursor-grabbing transition-all select-none shadow-sm relative group touch-none ${
+          isDragging
+            ? "bg-indigo-600/40 border-indigo-400 ring-2 ring-indigo-500 scale-105 shadow-xl"
+            : "bg-slate-800 border-slate-700 hover:border-indigo-500/60 hover:bg-indigo-600/10"
+        }`}
       >
         <span className="text-[9px] text-slate-500 font-semibold uppercase tracking-wide leading-none mb-1">#{index + 1}</span>
         <span className="text-white font-bold text-sm leading-none">p{page}</span>
@@ -161,8 +167,20 @@ export default function PdfViewerPage() {
   }, []);
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+    useSensor(MouseSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 200,
+        tolerance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
   );
 
   useEffect(() => {
@@ -514,7 +532,7 @@ export default function PdfViewerPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
                   </svg>
                   <span className="text-md font-semibold text-slate-300">Page order</span>
-                  <span className="text-sm font-semibold text-slate-400 hidden sm:inline">— drag to rearrange</span>
+                  <span className="text-xs sm:text-sm font-medium text-slate-400">— hold & drag to rearrange</span>
                 </div>
                 
                 {/* Preview Selected sequence button */}
@@ -550,7 +568,7 @@ export default function PdfViewerPage() {
                   </div>}
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                 <SortableContext items={selectedPages} strategy={horizontalListSortingStrategy}>
-                  <div className="flex gap-2 justify-center px-4 py-2 mt-2 overflow-x-auto scrollbar-none">
+                  <div className="flex gap-2 justify-start sm:justify-center px-4 py-2 mt-2 overflow-x-auto scrollbar-none touch-pan-x">
                     {selectedPages.map((page, index) => (
                       <SortablePageItem
                         key={page}
