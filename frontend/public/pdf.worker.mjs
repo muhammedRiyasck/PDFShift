@@ -1,5 +1,5 @@
 /**
- * Global polyfills for older/mobile engines (Chromium <= 121, Firefox Mobile, etc.)
+ * Global polyfills for older/mobile engines (Chromium <= 121, Samsung Internet, Firefox Mobile, etc.)
  */
 (function() {
   var g = typeof globalThis !== "undefined" ? globalThis : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : this;
@@ -43,6 +43,42 @@
         var binary = "";
         for (var i = 0; i < this.length; i++) binary += String.fromCharCode(this[i]);
         return typeof btoa === "function" ? btoa(binary) : "";
+      };
+    }
+  }
+
+  if (typeof g.Map !== "undefined") {
+    if (typeof g.Map.prototype.getOrInsertComputed !== "function") {
+      g.Map.prototype.getOrInsertComputed = function(key, callback) {
+        if (this.has(key)) return this.get(key);
+        var val = callback(key);
+        this.set(key, val);
+        return val;
+      };
+    }
+    if (typeof g.Map.prototype.getOrInsert !== "function") {
+      g.Map.prototype.getOrInsert = function(key, defaultValue) {
+        if (this.has(key)) return this.get(key);
+        this.set(key, defaultValue);
+        return defaultValue;
+      };
+    }
+  }
+
+  if (typeof g.WeakMap !== "undefined") {
+    if (typeof g.WeakMap.prototype.getOrInsertComputed !== "function") {
+      g.WeakMap.prototype.getOrInsertComputed = function(key, callback) {
+        if (this.has(key)) return this.get(key);
+        var val = callback(key);
+        this.set(key, val);
+        return val;
+      };
+    }
+    if (typeof g.WeakMap.prototype.getOrInsert !== "function") {
+      g.WeakMap.prototype.getOrInsert = function(key, defaultValue) {
+        if (this.has(key)) return this.get(key);
+        this.set(key, defaultValue);
+        return defaultValue;
       };
     }
   }

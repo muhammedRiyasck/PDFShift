@@ -78,3 +78,61 @@ if (typeof Uint8Array !== "undefined") {
   }
 }
 
+// Polyfill for Map.prototype.getOrInsertComputed and getOrInsert (TC39 proposal used by pdfjs-dist v6)
+if (typeof Map !== "undefined") {
+  const mapProto = Map.prototype as unknown as {
+    getOrInsertComputed?: <K, V>(key: K, callback: (key: K) => V) => V;
+    getOrInsert?: <K, V>(key: K, defaultValue: V) => V;
+  };
+
+  if (typeof mapProto.getOrInsertComputed !== "function") {
+    mapProto.getOrInsertComputed = function <K, V>(this: Map<K, V>, key: K, callback: (key: K) => V): V {
+      if (this.has(key)) {
+        return this.get(key)!;
+      }
+      const value = callback(key);
+      this.set(key, value);
+      return value;
+    };
+  }
+
+  if (typeof mapProto.getOrInsert !== "function") {
+    mapProto.getOrInsert = function <K, V>(this: Map<K, V>, key: K, defaultValue: V): V {
+      if (this.has(key)) {
+        return this.get(key)!;
+      }
+      this.set(key, defaultValue);
+      return defaultValue;
+    };
+  }
+}
+
+// Polyfill for WeakMap.prototype.getOrInsertComputed and getOrInsert
+if (typeof WeakMap !== "undefined") {
+  const weakMapProto = WeakMap.prototype as unknown as {
+    getOrInsertComputed?: <K extends object, V>(key: K, callback: (key: K) => V) => V;
+    getOrInsert?: <K extends object, V>(key: K, defaultValue: V) => V;
+  };
+
+  if (typeof weakMapProto.getOrInsertComputed !== "function") {
+    weakMapProto.getOrInsertComputed = function <K extends object, V>(this: WeakMap<K, V>, key: K, callback: (key: K) => V): V {
+      if (this.has(key)) {
+        return this.get(key)!;
+      }
+      const value = callback(key);
+      this.set(key, value);
+      return value;
+    };
+  }
+
+  if (typeof weakMapProto.getOrInsert !== "function") {
+    weakMapProto.getOrInsert = function <K extends object, V>(this: WeakMap<K, V>, key: K, defaultValue: V): V {
+      if (this.has(key)) {
+        return this.get(key)!;
+      }
+      this.set(key, defaultValue);
+      return defaultValue;
+    };
+  }
+}
+
