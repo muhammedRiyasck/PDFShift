@@ -2,7 +2,7 @@
 
 import "@/lib/polyfills";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import axios from "axios";
 import toast from "react-hot-toast";
@@ -72,17 +72,21 @@ function SortablePageItem({ page, index, onRemove, onPreview }: SortablePageItem
     transition,
     opacity: isDragging ? 0.5 : 1,
     zIndex: isDragging ? 50 : undefined,
-    touchAction: "none",
   };
 
   return (
-    <div ref={setNodeRef} style={style} className="flex-shrink-0 relative group touch-none select-none overflow-visible">
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="flex-shrink-0 relative group select-none overflow-visible"
+    >
       <div
         {...attributes}
         {...listeners}
         onClick={() => onPreview(page)}
         title="Hold & drag to rearrange, or click to preview"
-        className={`w-14 h-14 rounded-xl border flex flex-col items-center justify-center cursor-grab active:cursor-grabbing transition-all select-none shadow-sm relative group touch-none ${
+        style={{ touchAction: "pan-x" }}
+        className={`w-14 h-14 rounded-xl border flex flex-col items-center justify-center cursor-grab active:cursor-grabbing transition-all select-none shadow-sm relative group ${
           isDragging
             ? "bg-indigo-600/40 border-indigo-400 ring-2 ring-indigo-500 scale-105 shadow-xl"
             : "bg-slate-800 border-slate-700 hover:border-indigo-500/60 hover:bg-indigo-600/10"
@@ -145,6 +149,15 @@ export default function PdfViewerPage() {
   const [pageNumbersEnabled, setPageNumbersEnabled] = useState(false);
   const [pageNumberFormat, setPageNumberFormat] = useState<"page_n_of_total" | "n_slash_total" | "n_only">("page_n_of_total");
   const [pageNumberPosition, setPageNumberPosition] = useState<"bottom_center" | "bottom_right" | "bottom_left">("bottom_center");
+
+  const reorderScrollRef = useRef<HTMLDivElement>(null);
+
+  const scrollReorder = (direction: "left" | "right") => {
+    if (reorderScrollRef.current) {
+      const amount = direction === "left" ? -180 : 180;
+      reorderScrollRef.current.scrollBy({ left: amount, behavior: "smooth" });
+    }
+  };
 
   const rotatePage = useCallback((pageNum: number, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
@@ -524,24 +537,25 @@ export default function PdfViewerPage() {
 
         {/* ── Reorder strip (when pages are selected) ────────────── */}
         { (
-          <div className="border-t border-slate-800/60 bg-slate-900/60 px-4 sm:px-6 py-3 my-2">
-            <div className="max-w-7xl mx-auto">
-              <div className="flex items-center justify-between my-2.5">
-                <div className="flex items-center gap-2">
-                  <svg className="w-7 h-7 text-indigo-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="border-t border-slate-800/60 bg-slate-900/60 px-3 sm:px-6 py-2.5 my-2 w-full max-w-full overflow-hidden">
+            <div className="max-w-7xl mx-auto w-full min-w-0">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <svg className="w-5 h-5 sm:w-6 sm:h-6 text-indigo-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
                   </svg>
-                  <span className="text-md font-semibold text-slate-300">Page order</span>
-                  <span className="text-xs sm:text-sm font-medium text-slate-400">— hold & drag to rearrange</span>
+                  <span className="text-sm font-semibold text-slate-300 shrink-0">Page order</span>
+                  <span className="text-xs text-slate-400 truncate hidden sm:inline">— hold & drag to rearrange</span>
                 </div>
                 
                 {/* Preview Selected sequence button */}
-                {hasSelection && <button
-                  type="button"
-                  onClick={() => openPreview(selectedPages[0], "selected")}
-                  className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-indigo-600/15 border border-indigo-500/30 text-indigo-300 hover:bg-indigo-600/20 hover:text-indigo-400 transition-all font-medium active:scale-95 shadow-sm"
-                >
-                   <svg
+                {hasSelection && (
+                  <button
+                    type="button"
+                    onClick={() => openPreview(selectedPages[0], "selected")}
+                    className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg bg-indigo-600/15 border border-indigo-500/30 text-indigo-300 hover:bg-indigo-600/20 hover:text-indigo-400 transition-all font-medium active:scale-95 shadow-sm shrink-0"
+                  >
+                    <svg
                       className="w-3.5 h-3.5"
                       viewBox="0 0 24 24"
                       fill="none"
@@ -555,32 +569,68 @@ export default function PdfViewerPage() {
                       <circle cx="16" cy="17" r="3" />
                       <path d="m18.2 19.2 1.5 1.5" />
                     </svg>
-                  <span>Preview Selected ({selectedPages.length})</span>
-                </button>}
+                    <span>Preview ({selectedPages.length})</span>
+                  </button>
+                )}
               </div>
-              {!hasSelection&&<div className="flex flex-col items-center justify-center  px-4 text-center">
-                  <div className=" flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-slate-800/60 shadow-inner">
-                    <span className="text-xl text-slate-400">▤</span>
+
+              {!hasSelection && (
+                <div className="flex flex-col items-center justify-center py-2 px-4 text-center">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-slate-800/60 shadow-inner mb-1">
+                    <span className="text-lg text-slate-400">▤</span>
                   </div>
-                  <p className="text-sm font-semibold tracking-tight text-slate-200">
+                  <p className="text-xs font-semibold tracking-tight text-slate-300">
                     No Page Selected
                   </p>
-                  </div>}
-              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                <SortableContext items={selectedPages} strategy={horizontalListSortingStrategy}>
-                  <div className="flex gap-2 justify-start sm:justify-center px-4 py-2 mt-2 overflow-x-auto scrollbar-none touch-pan-x">
-                    {selectedPages.map((page, index) => (
-                      <SortablePageItem
-                        key={page}
-                        page={page}
-                        index={index}
-                        onRemove={removePage}
-                        onPreview={(p) => openPreview(p, "selected")}
-                      />
-                    ))}
+                </div>
+              )}
+
+              {hasSelection && (
+                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                  <div className="relative flex items-center w-full min-w-0">
+                    {/* Left scroll arrow button */}
+                    {selectedPages.length > 3 && (
+                      <button
+                        type="button"
+                        onClick={() => scrollReorder("left")}
+                        className="shrink-0 z-10 w-6 h-12 rounded-lg bg-slate-900/90 border border-slate-700/80 text-slate-300 hover:text-white hover:bg-slate-800 flex items-center justify-center shadow-md active:scale-90 mr-1 cursor-pointer select-none"
+                        aria-label="Scroll left"
+                      >
+                        ‹
+                      </button>
+                    )}
+
+                    <SortableContext items={selectedPages} strategy={horizontalListSortingStrategy}>
+                      <div
+                        ref={reorderScrollRef}
+                        className="flex gap-2 items-center px-1 py-1.5 overflow-x-auto scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent w-full min-w-0 scroll-smooth"
+                      >
+                        {selectedPages.map((page, index) => (
+                          <SortablePageItem
+                            key={page}
+                            page={page}
+                            index={index}
+                            onRemove={removePage}
+                            onPreview={(p) => openPreview(p, "selected")}
+                          />
+                        ))}
+                      </div>
+                    </SortableContext>
+
+                    {/* Right scroll arrow button */}
+                    {selectedPages.length > 3 && (
+                      <button
+                        type="button"
+                        onClick={() => scrollReorder("right")}
+                        className="shrink-0 z-10 w-6 h-12 rounded-lg bg-slate-900/90 border border-slate-700/80 text-slate-300 hover:text-white hover:bg-slate-800 flex items-center justify-center shadow-md active:scale-90 ml-1 cursor-pointer select-none"
+                        aria-label="Scroll right"
+                      >
+                        ›
+                      </button>
+                    )}
                   </div>
-                </SortableContext>
-              </DndContext>
+                </DndContext>
+              )}
             </div>
           </div>
         )}
