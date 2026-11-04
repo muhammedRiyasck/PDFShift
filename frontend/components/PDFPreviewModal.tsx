@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import "@/lib/polyfills";
+
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
@@ -13,7 +15,8 @@ if (typeof window !== "undefined") {
 interface PDFPreviewModalProps {
   isOpen: boolean;
   onClose: () => void;
-  pdfUrl: string;
+  pdfUrl?: string;
+  pdfData?: Uint8Array | null;
   totalPages: number;
   currentPage: number;
   onPageChange: (page: number) => void;
@@ -30,6 +33,7 @@ export default function PDFPreviewModal({
   isOpen,
   onClose,
   pdfUrl,
+  pdfData,
   totalPages,
   currentPage,
   onPageChange,
@@ -41,6 +45,19 @@ export default function PDFPreviewModal({
   annotations = [],
   onUpdateAnnotations,
 }: PDFPreviewModalProps) {
+  const [useDataFallback, setUseDataFallback] = useState(false);
+
+  const fileSource = useMemo(() => {
+    if (useDataFallback && pdfData && pdfData.byteLength > 0) {
+      return { data: pdfData.slice() };
+    }
+    if (pdfUrl) return pdfUrl;
+    if (pdfData && pdfData.byteLength > 0) {
+      return { data: pdfData.slice() };
+    }
+    return undefined;
+  }, [pdfData, pdfUrl, useDataFallback]);
+
   const [zoom, setZoom] = useState<number>(1);
   const [localRotation, setLocalRotation] = useState<number>(0);
   const currentRotation = pageRotations ? pageRotations[currentPage] || 0 : localRotation;
@@ -620,10 +637,21 @@ export default function PDFPreviewModal({
             className="relative flex items-center justify-center shadow-2xl rounded-lg overflow-hidden border border-slate-700/60 bg-slate-900"
           >
             <Document
-              file={pdfUrl}
+              file={fileSource}
               suspense={false}
+              onSourceError={(err) => {
+                const msg = err instanceof Error ? err.message : String(err);
+                console.error("[Modal Preview Source Error]", msg);
+                if (!useDataFallback && pdfData && pdfData.byteLength > 0) {
+                  setUseDataFallback(true);
+                }
+              }}
               onLoadError={(err) => {
+                const msg = err instanceof Error ? err.message : String(err);
                 console.error("PDF Preview Modal Document load error:", err);
+                if (!useDataFallback && pdfData && pdfData.byteLength > 0) {
+                  setUseDataFallback(true);
+                }
               }}
               loading={
                 <div
@@ -652,6 +680,7 @@ export default function PDFPreviewModal({
               <Page
                 pageNumber={currentPage}
                 width={pageWidth}
+                devicePixelRatio={Math.min(typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1, 2)}
                 rotate={currentRotation}
                 suspense={false}
                 renderTextLayer={false}

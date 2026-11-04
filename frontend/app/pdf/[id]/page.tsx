@@ -1,5 +1,7 @@
 "use client";
 
+import "@/lib/polyfills";
+
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import axios from "axios";
@@ -113,6 +115,7 @@ export default function PdfViewerPage() {
 
   const [pdfInfo, setPdfInfo] = useState<PdfInfo | null>(null);
   const [pdfUrl, setPdfUrl] = useState<string>("");
+  const [pdfData, setPdfData] = useState<Uint8Array | null>(null);
   const [selectedPages, setSelectedPages] = useState<number[]>([]);
   const [isExtracting, setIsExtracting] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -180,12 +183,34 @@ export default function PdfViewerPage() {
           if (isCancelled) return;
           toast.dismiss("fetch-retry");
           setPdfInfo(res.data);
-          setPdfUrl(`${API_BASE}/api/pdf/${id}/file`);
+          const fileUrl = `${API_BASE}/api/pdf/${id}/file`;
+
+          // Fetch the document buffer in main thread (surpasses mobile Smart Anti-Tracking)
+          try {
+            const fileRes = await axios.get(fileUrl, {
+              responseType: "arraybuffer",
+              timeout: 30000,
+            });
+            if (isCancelled) return;
+            // Create a blob URL — a single stable reference all thumbnails can share.
+            // This avoids spawning one pdfjs worker per thumbnail and prevents
+            // ArrayBuffer neutering that happens with { data: Uint8Array } sharing.
+            const blob = new Blob([fileRes.data], { type: "application/pdf" });
+            const blobUrl = URL.createObjectURL(blob);
+            setPdfUrl(blobUrl);
+            setPdfData(new Uint8Array(fileRes.data));
+          } catch (fileErr) {
+            console.warn("ArrayBuffer download failed, falling back to direct URL", fileErr);
+            // Last resort: direct backend URL
+            setPdfUrl(fileUrl);
+          }
+
           setLoading(false);
           return;
         } catch (err: unknown) {
           if (isCancelled) return;
-          console.error(`Attempt ${attempt} to fetch PDF info failed:`, err);
+          const errDetail = axios.isAxiosError(err) ? err.response?.data?.error || err.message : (err instanceof Error ? err.message : String(err));
+          console.error(`[fetchInfo] Attempt ${attempt} failed: ${errDetail}`);
           if (attempt < MAX_RETRIES) {
             toast.loading(`Loading document… (${attempt}/${MAX_RETRIES})`, {
               id: "fetch-retry",
@@ -193,9 +218,7 @@ export default function PdfViewerPage() {
             await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
           } else {
             toast.dismiss("fetch-retry");
-            const msg = axios.isAxiosError(err) ? err.response?.data?.error || err.message : "Document not found";
-            toast.error(`Could not load document: ${msg}`);
-            router.push("/");
+            toast.error(`Could not load document: ${errDetail}`);
           }
         }
       }
@@ -701,6 +724,7 @@ export default function PdfViewerPage() {
                 <div className="bg-slate-900">
                   <PDFPageThumbnail
                     pdfUrl={pdfUrl}
+                    pdfData={pdfData}
                     pageNumber={pageNum}
                     rotation={rotation}
                   />
@@ -772,6 +796,7 @@ export default function PdfViewerPage() {
         isOpen={previewModalOpen}
         onClose={() => setPreviewModalOpen(false)}
         pdfUrl={pdfUrl}
+        pdfData={pdfData}
         totalPages={pdfInfo.pageCount}
         currentPage={previewPage}
         onPageChange={setPreviewPage}
