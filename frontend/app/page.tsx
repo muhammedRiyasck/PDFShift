@@ -406,23 +406,26 @@ export default function HomePage() {
             >
               {selectedFile ? (
                 <div className="space-y-3.5 sm:space-y-4">
-                  <div className="relative flex justify-center">
+                  {/* Remove button at top-right of card */}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedFile(null);
+                      const input = document.getElementById("file-input") as HTMLInputElement;
+                      if (input) input.value = "";
+                    }}
+                    aria-label="Remove selected file"
+                    title="Remove file"
+                    className="absolute top-3 right-3 sm:top-4 sm:right-4 w-8 h-8 rounded-full bg-slate-800/80 hover:bg-rose-500 active:bg-rose-600 border border-slate-700/80 hover:border-rose-400 text-slate-300 hover:text-white flex items-center justify-center shadow-lg backdrop-blur-md transition-all active:scale-90 cursor-pointer z-10"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+
+                  <div className="flex justify-center">
                     <PDFIcon size={56} />
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedFile(null);
-                        const input = document.getElementById("file-input") as HTMLInputElement;
-                        if (input) input.value = "";
-                      }}
-                      aria-label="Remove selected file"
-                      className="absolute -top-8 -right-5 w-6 h-6 rounded hover:bg-rose-400 active:scale-90 text-white flex items-center justify-center shadow-lg transition-all"
-                    >
-                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
                   </div>
 
                   <div>

@@ -106,11 +106,16 @@ function SortablePageItem({ page, index, onRemove, onPreview }: SortablePageItem
       {/* Remove badge */}
       <button
         type="button"
-        onClick={(e) => { e.stopPropagation(); onRemove(page); }}
+        onPointerDown={(e) => e.stopPropagation()}
+        onTouchStart={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.stopPropagation();
+          onRemove(page);
+        }}
         aria-label={`Remove page ${page}`}
-        className="absolute -top-2 -right-2 sm:-top-1.5 sm:-right-1.5 w-6 h-6 sm:w-5 sm:h-5 rounded-full bg-rose-500 hover:bg-rose-400 active:scale-90 text-white flex items-center justify-center shadow-md transition-all opacity-100 sm:opacity-0 sm:group-hover:opacity-100 z-10"
+        className="absolute -top-2 -right-2 sm:-top-1.5 sm:-right-1.5 w-6 h-6 sm:w-5 sm:h-5 rounded-full bg-rose-500 hover:bg-rose-400 active:scale-75 text-white flex items-center justify-center shadow-lg transition-all opacity-100 sm:opacity-0 sm:group-hover:opacity-100 z-20 cursor-pointer touch-manipulation ring-2 ring-slate-900 before:absolute before:-inset-2 before:content-['']"
       >
-        <svg className="w-3 h-3 sm:w-2.5 sm:h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+        <svg className="w-3.5 h-3.5 sm:w-2.5 sm:h-2.5 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
         </svg>
       </button>
