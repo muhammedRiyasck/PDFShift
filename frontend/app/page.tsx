@@ -7,6 +7,24 @@ import toast from "react-hot-toast";
 import { API_BASE } from "@/lib/config";
 import PDFIcon from "@/components/PDFIcon";
 
+// ---------------------------------------------------------------------------
+// Utility: count pages in a PDF File using pdf-lib (runs entirely in-browser,
+// no network round-trip needed — the result is forwarded to confirm-upload so
+// the backend can skip its own S3 re-download).
+// ---------------------------------------------------------------------------
+async function countPdfPages(file: File): Promise<number> {
+  try {
+    const { PDFDocument } = await import("pdf-lib");
+    const buffer = await file.arrayBuffer();
+    const pdf = await PDFDocument.load(buffer, { ignoreEncryption: true });
+    return pdf.getPageCount();
+  } catch {
+    // If pdf-lib fails (encrypted / corrupted), return 0 so the backend
+    // falls back to its own count via getFileBuffer.
+    return 0;
+  }
+}
+
 export default function HomePage() {
   const router = useRouter();
 
@@ -25,6 +43,9 @@ export default function HomePage() {
   const [mergedDownloadUrl, setMergedDownloadUrl] = useState<string | null>(null);
   const [mergedPageCount, setMergedPageCount] = useState<number>(0);
 
+  // Upload progress for the S3 PUT step (0–100 or null when idle)
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+
   /* ──────────────────────────────────────────────────────────────────────────
      Extract mode helpers
      ────────────────────────────────────────────────────────────────────────── */
@@ -40,10 +61,17 @@ export default function HomePage() {
     setSelectedFile(file);
   };
 
-  const uploadSingleFileToS3 = async (file: File): Promise<string> => {
+  const uploadSingleFileToS3 = async (
+    file: File,
+    onProgress?: (pct: number) => void
+  ): Promise<string> => {
     const effectiveContentType = file.type && file.type.length > 0 ? file.type : "application/pdf";
 
-    // 1. Request presigned upload URL from backend
+    // 1. Count pages in the browser — avoids a full S3 re-download on the backend
+    //    during the confirm step (backend falls back to its own count if 0 is returned).
+    const pageCount = await countPdfPages(file);
+
+    // 2. Request presigned upload URL from backend
     let presignRes;
     try {
       presignRes = await axios.post(`${API_BASE}/api/presign-upload`, {
@@ -57,31 +85,31 @@ export default function HomePage() {
 
     const { id, uploadUrl, s3Key } = presignRes.data;
 
-    // 2. Direct upload to AWS S3 via native fetch PUT (resilient on mobile browsers)
+    // 3. Direct upload to AWS S3 via axios PUT (supports onUploadProgress for the
+    //    progress bar; native fetch does not expose upload progress).
     try {
-      const uploadRes = await fetch(uploadUrl, {
-        method: "PUT",
-        body: file,
-        headers: {
-          "Content-Type": effectiveContentType,
+      await axios.put(uploadUrl, file, {
+        headers: { "Content-Type": effectiveContentType },
+        onUploadProgress: (e) => {
+          if (onProgress && e.total) {
+            onProgress(Math.round((e.loaded / e.total) * 100));
+          }
         },
       });
-
-      if (!uploadRes.ok) {
-        throw new Error(`S3 rejected upload with HTTP status ${uploadRes.status}`);
-      }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const msg = axios.isAxiosError(err) ? err.response?.data?.error || err.message : String(err);
       throw new Error(`Step 2 (Storage Upload) failed: ${msg}`);
     }
 
-    // 3. Confirm upload with backend to register metadata & page count
+    // 4. Confirm upload — sends pre-computed pageCount so the backend can skip
+    //    an expensive S3 GetObject just to count pages.
     try {
       await axios.post(`${API_BASE}/api/confirm-upload`, {
         id,
         s3Key,
         originalName: file.name,
         fileSize: file.size,
+        pageCount,
       });
     } catch (err: unknown) {
       const msg = axios.isAxiosError(err) ? err.response?.data?.error || err.message : String(err);
@@ -94,8 +122,9 @@ export default function HomePage() {
   const handleUpload = async () => {
     if (!selectedFile) return;
     setIsUploading(true);
+    setUploadProgress(0);
     try {
-      const id = await uploadSingleFileToS3(selectedFile);
+      const id = await uploadSingleFileToS3(selectedFile, setUploadProgress);
       toast.success("Document loaded securely!");
       router.push(`/pdf/${id}`);
     } catch (err: unknown) {
@@ -108,6 +137,7 @@ export default function HomePage() {
       toast.error(message, { duration: 5000 });
     } finally {
       setIsUploading(false);
+      setUploadProgress(null);
     }
   };
 
@@ -160,13 +190,32 @@ export default function HomePage() {
     setMergedDownloadUrl(null);
 
     try {
-      // 1. Upload all files sequentially to avoid saturating browser bandwidth
-      const uploadedIds: string[] = [];
+      // Upload all files in parallel (max 2 concurrent) so merge is ~2× faster
+      // than sequential while not overwhelming mobile bandwidth.
+      const MAX_CONCURRENT = 2;
+      const uploadedIds: string[] = new Array(mergeFiles.length);
+      let completed = 0;
+      setMergeProgress(`Uploading ${mergeFiles.length} documents…`);
+
+      // Run with a simple concurrency-limited pool
+      const pool: Promise<void>[] = [];
       for (let i = 0; i < mergeFiles.length; i++) {
-        setMergeProgress(`Uploading document ${i + 1} of ${mergeFiles.length}...`);
-        const id = await uploadSingleFileToS3(mergeFiles[i]);
-        uploadedIds.push(id);
+        const idx = i;
+        const task = (async () => {
+          uploadedIds[idx] = await uploadSingleFileToS3(mergeFiles[idx]);
+          completed++;
+          setMergeProgress(`Uploaded ${completed} of ${mergeFiles.length} documents…`);
+        })();
+        pool.push(task);
+        if (pool.length >= MAX_CONCURRENT) {
+          await Promise.race(pool);
+          // Remove resolved promises to keep pool size bounded
+          for (let j = pool.length - 1; j >= 0; j--) {
+            pool[j] = pool[j].then(() => undefined, () => undefined);
+          }
+        }
       }
+      await Promise.all(pool);
 
       // 2. Call backend merge endpoint
       setMergeProgress("Merging and assembling documents...");
@@ -464,43 +513,65 @@ export default function HomePage() {
             </div>
 
             {selectedFile && (
-              <button
-                onClick={handleUpload}
-                disabled={isUploading}
-                className={`relative w-full mt-4 py-3.5 px-6 rounded-2xl
-                  inline-flex items-center justify-center gap-2.5
-                  overflow-hidden border backdrop-blur-xl
-                  text-sm sm:text-base font-semibold
-                  transition-all duration-300 ease-out
-                  ${
-                    !isUploading
-                      ? "bg-gradient-to-b from-indigo-500/25 to-indigo-700/20 border-indigo-400/40 text-indigo-100 shadow-[0_4px_20px_rgba(99,102,241,0.18)] hover:from-indigo-400/35 hover:to-indigo-600/30 hover:border-indigo-300/60 hover:text-white hover:shadow-[0_4px_25px_rgba(99,102,241,0.35)] hover:-translate-y-0.5 active:translate-y-0"
-                      : "bg-slate-800/40 border-white/5 text-slate-500 opacity-60 cursor-not-allowed"
-                  }
-                  before:absolute before:inset-0
-                  before:bg-gradient-to-r before:from-transparent before:via-white/15 before:to-transparent
-                  before:-translate-x-full
-                  before:transition-transform before:duration-700
-                  enabled:hover:before:translate-x-full
-                  disabled:cursor-not-allowed cursor-pointer`}
-              >
-                {isUploading ? (
-                  <>
-                    <svg className="animate-spin w-5 h-5 text-white" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                    </svg>
-                    <span>Securing & Loading Document...</span>
-                  </>
-                ) : (
-                  <>
-                    <span>Open in Page Selector</span>
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                    </svg>
-                  </>
+              <>
+                {/* Upload progress bar — shown while the S3 PUT is in flight */}
+                {isUploading && uploadProgress !== null && (
+                  <div className="mt-4 w-full">
+                    <div className="flex items-center justify-between mb-1.5 text-xs text-slate-400">
+                      <span>Uploading to secure storage…</span>
+                      <span className="font-mono font-semibold text-indigo-300">{uploadProgress}%</span>
+                    </div>
+                    <div className="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-all duration-200"
+                        style={{ width: `${uploadProgress}%` }}
+                      />
+                    </div>
+                  </div>
                 )}
-              </button>
+
+                <button
+                  onClick={handleUpload}
+                  disabled={isUploading}
+                  className={`relative w-full mt-4 py-3.5 px-6 rounded-2xl
+                    inline-flex items-center justify-center gap-2.5
+                    overflow-hidden border backdrop-blur-xl
+                    text-sm sm:text-base font-semibold
+                    transition-all duration-300 ease-out
+                    ${
+                      !isUploading
+                        ? "bg-gradient-to-b from-indigo-500/25 to-indigo-700/20 border-indigo-400/40 text-indigo-100 shadow-[0_4px_20px_rgba(99,102,241,0.18)] hover:from-indigo-400/35 hover:to-indigo-600/30 hover:border-indigo-300/60 hover:text-white hover:shadow-[0_4px_25px_rgba(99,102,241,0.35)] hover:-translate-y-0.5 active:translate-y-0"
+                        : "bg-slate-800/40 border-white/5 text-slate-500 opacity-60 cursor-not-allowed"
+                    }
+                    before:absolute before:inset-0
+                    before:bg-gradient-to-r before:from-transparent before:via-white/15 before:to-transparent
+                    before:-translate-x-full
+                    before:transition-transform before:duration-700
+                    enabled:hover:before:translate-x-full
+                    disabled:cursor-not-allowed cursor-pointer`}
+                >
+                  {isUploading ? (
+                    <>
+                      <svg className="animate-spin w-5 h-5 text-white" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                      <span>
+                        {uploadProgress !== null && uploadProgress < 100
+                          ? `Uploading… ${uploadProgress}%`
+                          : "Securing & Loading Document..."}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Open in Page Selector</span>
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                      </svg>
+                    </>
+                  )}
+                </button>
+              </>
             )}
           </>
         )}

@@ -15,6 +15,7 @@
     "@tailwindcss/postcss": "^4.3.3",
     "axios": "^1.21.0",
     "next": "16.4.3",
+    "pdf-lib": "^1.17.1",
     "pdfjs-dist": "6.3.289",
     "postcss": "^8.5.32",
     "react": "19.3.0",
