@@ -8,8 +8,24 @@ dotenv.config({ path: path.resolve(process.cwd(), 'backend', '.env') });
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 
 import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { Upload } from '@aws-sdk/lib-storage';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { LRUCache } from 'lru-cache';
 import { IStorageService } from '../../domain/services/IStorageService';
+
+/**
+ * In-process LRU cache for PDF file buffers.
+ *
+ * - max 15 entries or 150 MB total (safe on Render's 512 MB free tier)
+ * - 10-minute TTL — stale enough that short re-edits hit the cache,
+ *   fresh enough that we never serve significantly out-of-date data
+ */
+const bufferCache = new LRUCache<string, Buffer>({
+  max: 15,
+  maxSize: 150 * 1024 * 1024, // 150 MB
+  sizeCalculation: (buf) => buf.length,
+  ttl: 1000 * 60 * 10, // 10 minutes
+});
 
 export interface S3Config {
   region: string;
@@ -81,6 +97,11 @@ export class S3StorageService implements IStorageService {
   }
 
   async getFileBuffer(key: string): Promise<Buffer> {
+    // Return cached buffer when available — avoids repeated S3 GetObject calls
+    // for the same PDF during extract/merge/view operations.
+    const cached = bufferCache.get(key);
+    if (cached) return cached;
+
     const bucket = this.getBucket();
     const client = this.getClient();
 
@@ -95,7 +116,10 @@ export class S3StorageService implements IStorageService {
     }
 
     const byteArray = await response.Body.transformToByteArray();
-    return Buffer.from(byteArray);
+    const buf = Buffer.from(byteArray);
+
+    bufferCache.set(key, buf);
+    return buf;
   }
 
   async uploadFile(
@@ -106,14 +130,26 @@ export class S3StorageService implements IStorageService {
     const bucket = this.getBucket();
     const client = this.getClient();
 
-    const command = new PutObjectCommand({
-      Bucket: bucket,
-      Key: key,
-      Body: buffer,
-      ContentType: contentType,
+    // Use the managed Upload utility which automatically switches to multipart
+    // for buffers >5 MB, uploading up to 4 parts in parallel. For small buffers
+    // it falls back to a single PutObject — behaviour is identical to before.
+    const upload = new Upload({
+      client,
+      params: {
+        Bucket: bucket,
+        Key: key,
+        Body: buffer,
+        ContentType: contentType,
+      },
+      queueSize: 4,            // parallel part uploads
+      partSize: 5 * 1024 * 1024, // 5 MB minimum part size (S3 requirement)
     });
 
-    await client.send(command);
+    await upload.done();
+
+    // Warm the cache with the freshly uploaded buffer so subsequent reads
+    // (e.g. getPdfFile right after extractPages) don't hit S3 again.
+    bufferCache.set(key, Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer));
   }
 
   async getPresignedDownloadUrl(

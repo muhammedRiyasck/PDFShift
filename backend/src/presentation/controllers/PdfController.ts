@@ -33,7 +33,7 @@ export class PdfController {
 
   confirmUpload = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const { id, s3Key, originalName, fileSize } = req.body;
+      const { id, s3Key, originalName, fileSize, pageCount } = req.body;
       if (!id || !s3Key || !originalName) {
         res.status(400).json({ error: 'id, s3Key, and originalName are required' });
         return;
@@ -44,6 +44,7 @@ export class PdfController {
         s3Key,
         originalName,
         fileSize,
+        pageCount: typeof pageCount === 'number' ? pageCount : undefined,
       });
 
       res.status(201).json({
