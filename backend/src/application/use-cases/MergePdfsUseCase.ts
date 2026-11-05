@@ -60,7 +60,7 @@ export class MergePdfsUseCase {
     // 5. Presigned download URL
     const downloadUrl = await this.storageService.getPresignedDownloadUrl(
       outputKey,
-      'merged-document.pdf'
+      'PDFShift-merged-document.pdf'
     );
 
     return {

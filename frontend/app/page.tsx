@@ -233,7 +233,7 @@ export default function HomePage() {
       // Trigger auto download
       const a = document.createElement("a");
       a.href = url;
-      a.download = "merged-document.pdf";
+      a.download = "PDFShift-merged-document.pdf";
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -752,7 +752,7 @@ export default function HomePage() {
 
                 <a
                   href={mergedDownloadUrl}
-                  download="merged-document.pdf"
+                  download="PDFShift-merged-document.pdf"
                   className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-md transition-all shrink-0"
                 >
                   Download

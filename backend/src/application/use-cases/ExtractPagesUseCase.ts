@@ -59,14 +59,17 @@ export class ExtractPagesUseCase {
     );
 
     // 3. Upload extracted output directly to S3 outputs/
-    const outputFilename = `extracted-${uuidv4()}.pdf`;
+    const outputFilename = `PDFShift-${uuidv4()}.pdf`;
     const outputKey = `outputs/${outputFilename}`;
     await this.storageService.uploadFile(outputKey, extractedBytes, 'application/pdf');
 
     // 4. Generate presigned download URL
+    const cleanOriginalName = doc.originalName.toLowerCase().endsWith('.pdf')
+      ? doc.originalName
+      : `${doc.originalName}.pdf`;
     const downloadUrl = await this.storageService.getPresignedDownloadUrl(
       outputKey,
-      `extracted-${doc.originalName}`
+      `PDFShift-${cleanOriginalName}`
     );
 
     return {

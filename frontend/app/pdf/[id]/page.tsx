@@ -337,9 +337,15 @@ export default function PdfViewerPage() {
         : `${API_BASE}${res.data.downloadUrl}`;
       setDownloadUrl(url);
       setExtractedCount(selectedPages.length);
+
+      const cleanName = pdfInfo?.originalName
+        ? (pdfInfo.originalName.toLowerCase().endsWith(".pdf") ? pdfInfo.originalName : `${pdfInfo.originalName}.pdf`)
+        : "extracted-pages.pdf";
+      const downloadName = `PDFShift-${cleanName}`;
+
       const a = document.createElement("a");
       a.href = url;
-      a.download = "extracted-pages.pdf";
+      a.download = downloadName;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -686,7 +692,11 @@ export default function PdfViewerPage() {
             <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
               <a
                 href={downloadUrl}
-                download="extracted-pages.pdf"
+                download={
+                  pdfInfo?.originalName
+                    ? `PDFShift-${pdfInfo.originalName.toLowerCase().endsWith(".pdf") ? pdfInfo.originalName : `${pdfInfo.originalName}.pdf`}`
+                    : "PDFShift-extracted-pages.pdf"
+                }
                 className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition-colors shadow-md shadow-emerald-600/20"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
